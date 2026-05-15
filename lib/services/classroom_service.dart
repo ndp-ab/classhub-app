@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ClassroomService {
-  static const String baseUrl = 'http://192.168.1.9:8080/api';
-
+  //static const String baseUrl = 'http://192.168.1.5:8080/api';
+  static const String baseUrl = 'http://localhost:8080/api';
   Future<Map<String, dynamic>> createClassroom(String className, String faculty, String academicYear, int userId) async {
     try {
       final response = await http.post(
