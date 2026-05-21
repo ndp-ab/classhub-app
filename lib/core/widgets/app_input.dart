@@ -20,6 +20,7 @@ class AppInput extends StatelessWidget {
     this.autofocus = false,
     this.keyboardType,
     this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
     this.inputFormatters,
     this.maxLines = 1,
     this.minLines,
@@ -30,6 +31,8 @@ class AppInput extends StatelessWidget {
     this.validator,
     this.focusNode,
     this.initialValue,
+    this.textStyle,
+    this.textAlign = TextAlign.start,
   });
 
   final TextEditingController? controller;
@@ -45,6 +48,7 @@ class AppInput extends StatelessWidget {
   final bool autofocus;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
   final List<TextInputFormatter>? inputFormatters;
   final int? maxLines;
   final int? minLines;
@@ -55,6 +59,8 @@ class AppInput extends StatelessWidget {
   final FormFieldValidator<String>? validator;
   final FocusNode? focusNode;
   final String? initialValue;
+  final TextStyle? textStyle;
+  final TextAlign textAlign;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +87,7 @@ class AppInput extends StatelessWidget {
           obscureText: obscureText,
           keyboardType: keyboardType,
           textInputAction: textInputAction,
+          textCapitalization: textCapitalization,
           inputFormatters: inputFormatters,
           maxLines: obscureText ? 1 : maxLines,
           minLines: minLines,
@@ -89,7 +96,8 @@ class AppInput extends StatelessWidget {
           onFieldSubmitted: onSubmitted,
           onTap: onTap,
           validator: validator,
-          style: AppTextStyles.body,
+          style: textStyle ?? AppTextStyles.body,
+          textAlign: textAlign,
           cursorColor: AppColors.primary,
           decoration: InputDecoration(
             hintText: hint,
