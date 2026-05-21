@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_radius.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
+import '../core/widgets/app_button.dart';
+import '../core/widgets/app_card.dart';
+import '../core/widgets/app_input.dart';
 import '../providers/auth_provider.dart';
 import '../services/classroom_service.dart';
 
@@ -41,15 +48,17 @@ class _CreateClassroomScreenState extends State<CreateClassroomScreen> {
       userId!,
     );
 
-    setState(() => _isLoading = false);
-
     if (!mounted) return;
+    setState(() => _isLoading = false);
 
     if (result['success']) {
       setState(() => _inviteCode = result['data']['inviteCode']);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(result['message']),
+          backgroundColor: AppColors.danger,
+        ),
       );
     }
   }
@@ -58,9 +67,12 @@ class _CreateClassroomScreenState extends State<CreateClassroomScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Tạo lớp học mới')),
-      body: Center(
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontal,
+            vertical: AppSpacing.largeSection,
+          ),
           child: _inviteCode != null ? _buildSuccess() : _buildForm(),
         ),
       ),
@@ -71,47 +83,46 @@ class _CreateClassroomScreenState extends State<CreateClassroomScreen> {
     return Form(
       key: _formKey,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextFormField(
+          Text('Thông tin lớp', style: AppTextStyles.heading),
+          const SizedBox(height: AppSpacing.small),
+          Text(
+            'Điền thông tin để tạo lớp học mới. Hệ thống sẽ sinh mã mời để bạn chia sẻ.',
+            style: AppTextStyles.caption,
+          ),
+          const SizedBox(height: AppSpacing.largeSection),
+          AppInput(
             controller: _classNameController,
-            decoration: const InputDecoration(
-              labelText: 'Tên lớp',
-              hintText: 'VD: 64KTPM3',
-              prefixIcon: Icon(Icons.class_outlined),
-              border: OutlineInputBorder(),
-            ),
+            label: 'Tên lớp',
+            hint: 'VD: 64KTPM3',
+            prefixIcon: const Icon(Icons.class_outlined),
+            textInputAction: TextInputAction.next,
             validator: (v) => v == null || v.isEmpty ? 'Nhập tên lớp' : null,
           ),
-          const SizedBox(height: 16),
-          TextFormField(
+          const SizedBox(height: AppSpacing.cardPadding),
+          AppInput(
             controller: _facultyController,
-            decoration: const InputDecoration(
-              labelText: 'Khoa',
-              hintText: 'VD: Công nghệ thông tin',
-              prefixIcon: Icon(Icons.business_outlined),
-              border: OutlineInputBorder(),
-            ),
+            label: 'Khoa',
+            hint: 'VD: Công nghệ thông tin',
+            prefixIcon: const Icon(Icons.business_outlined),
+            textInputAction: TextInputAction.next,
           ),
-          const SizedBox(height: 16),
-          TextFormField(
+          const SizedBox(height: AppSpacing.cardPadding),
+          AppInput(
             controller: _academicYearController,
-            decoration: const InputDecoration(
-              labelText: 'Khóa',
-              hintText: 'VD: K64',
-              prefixIcon: Icon(Icons.calendar_today_outlined),
-              border: OutlineInputBorder(),
-            ),
+            label: 'Khóa',
+            hint: 'VD: K64',
+            prefixIcon: const Icon(Icons.calendar_today_outlined),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _create(),
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _create,
-              child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Tạo lớp', style: TextStyle(fontSize: 16)),
-            ),
+          const SizedBox(height: AppSpacing.largeSection),
+          AppButton(
+            label: 'Tạo lớp',
+            size: AppButtonSize.large,
+            loading: _isLoading,
+            onPressed: _isLoading ? null : _create,
           ),
         ],
       ),
@@ -120,53 +131,90 @@ class _CreateClassroomScreenState extends State<CreateClassroomScreen> {
 
   Widget _buildSuccess() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.check_circle, size: 80, color: Colors.green),
-        const SizedBox(height: 16),
-        const Text(
-          'Tạo lớp thành công!',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 24),
-        const Text('Mã tham gia lớp:', style: TextStyle(fontSize: 16, color: Colors.grey)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.blue.shade200),
-          ),
-          child: Text(
-            _inviteCode!,
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 4,
-              color: Colors.blue.shade700,
+        Center(
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.check_rounded,
+              size: 36,
+              color: AppColors.success,
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
+        const SizedBox(height: AppSpacing.cardPadding),
+        Text(
+          'Tạo lớp thành công',
+          style: AppTextStyles.title,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.small),
+        Text(
+          'Chia sẻ mã mời dưới đây với sinh viên để tham gia lớp.',
+          style: AppTextStyles.caption,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.largeSection),
+        AppCard(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sectionPadding,
+            vertical: AppSpacing.largeSection,
+          ),
+          backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+          borderColor: AppColors.primary.withValues(alpha: 0.2),
+          child: Column(
+            children: [
+              Text(
+                'MÃ THAM GIA',
+                style: AppTextStyles.small.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.small),
+              Text(
+                _inviteCode!,
+                style: AppTextStyles.display.copyWith(
+                  color: AppColors.primary,
+                  letterSpacing: 6,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.cardPadding),
+        AppButton(
+          label: 'Sao chép mã',
+          icon: Icons.copy_rounded,
+          variant: AppButtonVariant.secondary,
           onPressed: () {
             Clipboard.setData(ClipboardData(text: _inviteCode!));
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Đã copy mã tham gia')),
             );
           },
-          icon: const Icon(Icons.copy),
-          label: const Text('Copy mã'),
         ),
-        const SizedBox(height: 8),
-        const Text(
-          'Gửi mã này cho sinh viên để tham gia lớp',
-          style: TextStyle(color: Colors.grey),
-        ),
-        const SizedBox(height: 24),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text('Quay về trang chủ'),
+        const SizedBox(height: AppSpacing.element),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            style: TextButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.button),
+              ),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Quay về trang chủ'),
+          ),
         ),
       ],
     );
