@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
+import '../core/widgets/app_button.dart';
+import '../core/widgets/app_input.dart';
 import '../providers/auth_provider.dart';
 import '../services/classroom_service.dart';
 
@@ -33,17 +38,18 @@ class _JoinClassroomScreenState extends State<JoinClassroomScreen> {
       userId!,
     );
 
-    setState(() => _isLoading = false);
-
     if (!mounted) return;
+    setState(() => _isLoading = false);
 
     if (result['success']) {
       final data = result['data'];
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('Tham gia thành công!'),
-          content: Text('Bạn đã tham gia lớp ${data['className']} với vai trò ${data['role']}'),
+          title: const Text('Tham gia thành công'),
+          content: Text(
+            'Bạn đã tham gia lớp ${data['className']} với vai trò ${data['role']}.',
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -57,7 +63,10 @@ class _JoinClassroomScreenState extends State<JoinClassroomScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(result['message']),
+          backgroundColor: AppColors.danger,
+        ),
       );
     }
   }
@@ -66,46 +75,63 @@ class _JoinClassroomScreenState extends State<JoinClassroomScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Tham gia lớp học')),
-      body: Center(
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontal,
+            vertical: AppSpacing.largeSection,
+          ),
           child: Form(
             key: _formKey,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.group_add, size: 80, color: Colors.blue),
-                const SizedBox(height: 16),
-                const Text(
+                Center(
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.group_add_outlined,
+                      size: 36,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.cardPadding),
+                Text(
                   'Nhập mã tham gia',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  style: AppTextStyles.title,
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 8),
-                const Text(
+                const SizedBox(height: AppSpacing.small),
+                Text(
                   'Nhận mã từ ban cán sự lớp',
-                  style: TextStyle(color: Colors.grey),
+                  style: AppTextStyles.caption,
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 32),
-                TextFormField(
+                const SizedBox(height: AppSpacing.largeVertical),
+                AppInput(
                   controller: _codeController,
+                  hint: 'VD: X7A9KQ',
                   textCapitalization: TextCapitalization.characters,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
-                  decoration: const InputDecoration(
-                    hintText: 'VD: X7A9KQ',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (v) => v == null || v.isEmpty ? 'Nhập mã tham gia' : null,
+                  textInputAction: TextInputAction.done,
+                  textStyle: AppTextStyles.heading.copyWith(letterSpacing: 6),
+                  onSubmitted: (_) => _join(),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Nhập mã tham gia' : null,
                 ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _join,
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text('Tham gia', style: TextStyle(fontSize: 16)),
-                  ),
+                const SizedBox(height: AppSpacing.largeSection),
+                AppButton(
+                  label: 'Tham gia',
+                  size: AppButtonSize.large,
+                  loading: _isLoading,
+                  onPressed: _isLoading ? null : _join,
                 ),
               ],
             ),
