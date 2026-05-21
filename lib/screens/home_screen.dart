@@ -5,6 +5,7 @@ import '../services/classroom_service.dart';
 import 'login_screen.dart';
 import 'create_classroom_screen.dart';
 import 'join_classroom_screen.dart';
+import 'classroom_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -135,6 +136,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: const TextStyle(fontSize: 12),
                       ),
                     ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ClassroomDetailScreen(
+                            classroomId: (c['id'] as num).toInt(),
+                            classroomName: c['className'] ?? '',
+                            inviteCode: c['inviteCode'],
+                            role: c['role'],
+                            faculty: c['faculty'],
+                            academicYear: c['academicYear'],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 );
               },

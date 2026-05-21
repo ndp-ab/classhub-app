@@ -1,17 +1,30 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
+/// Service cho phân hệ Lớp học.
+/// Sau B1 (JWT filter), backend đã yêu cầu Authorization: Bearer <token>
+/// thay vì X-User-Id. Tham số userId vẫn giữ trong signature để tránh đổi UI,
+/// nhưng KHÔNG còn được gửi qua header.
 class ClassroomService {
   //static const String baseUrl = 'http://192.168.1.5:8080/api';
   static const String baseUrl = 'http://localhost:8080/api';
-  Future<Map<String, dynamic>> createClassroom(String className, String faculty, String academicYear, int userId) async {
+
+  Future<Map<String, String>> _headers({bool json = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt_token');
+    final h = <String, String>{};
+    if (json) h['Content-Type'] = 'application/json';
+    if (token != null && token.isNotEmpty) h['Authorization'] = 'Bearer $token';
+    return h;
+  }
+
+  Future<Map<String, dynamic>> createClassroom(String className, String faculty,
+      String academicYear, int userId) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/classrooms/create'),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': userId.toString(),
-        },
+        headers: await _headers(json: true),
         body: json.encode({
           'className': className,
           'faculty': faculty,
@@ -33,10 +46,7 @@ class ClassroomService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/classrooms/join'),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': userId.toString(),
-        },
+        headers: await _headers(json: true),
         body: json.encode({
           'inviteCode': inviteCode,
         }),
@@ -56,9 +66,7 @@ class ClassroomService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/classrooms/my'),
-        headers: {
-          'X-User-Id': userId.toString(),
-        },
+        headers: await _headers(),
       );
 
       if (response.statusCode == 200) {
