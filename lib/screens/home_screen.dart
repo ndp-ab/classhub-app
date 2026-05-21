@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_radius.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
+import '../core/widgets/app_button.dart';
+import '../core/widgets/app_card.dart';
+import '../core/widgets/app_empty_state.dart';
+import '../core/widgets/app_loading.dart';
 import '../providers/auth_provider.dart';
 import '../services/classroom_service.dart';
 import 'login_screen.dart';
@@ -61,14 +69,15 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('ClassHub'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout_outlined),
+            tooltip: 'Đăng xuất',
             onPressed: () async {
               await auth.logout();
               if (!context.mounted) return;
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    (route) => false,
+                (route) => false,
               );
             },
           ),
@@ -77,86 +86,183 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenHorizontal,
+              AppSpacing.cardPadding,
+              AppSpacing.screenHorizontal,
+              AppSpacing.small,
+            ),
             child: Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _navigateAndRefresh(const CreateClassroomScreen()),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Tạo lớp'),
+                  child: AppButton(
+                    label: 'Tạo lớp',
+                    icon: Icons.add,
+                    onPressed: () =>
+                        _navigateAndRefresh(const CreateClassroomScreen()),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.element),
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _navigateAndRefresh(const JoinClassroomScreen()),
-                    icon: const Icon(Icons.group_add),
-                    label: const Text('Tham gia'),
+                  child: AppButton(
+                    label: 'Tham gia',
+                    icon: Icons.group_add_outlined,
+                    variant: AppButtonVariant.secondary,
+                    onPressed: () =>
+                        _navigateAndRefresh(const JoinClassroomScreen()),
                   ),
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _classrooms.isEmpty
-                ? const Center(
-              child: Text(
-                'Chưa tham gia lớp nào\nBấm "Tạo lớp" hoặc "Tham gia" để bắt đầu',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, fontSize: 16),
-              ),
-            )
-                : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _classrooms.length,
-              itemBuilder: (context, index) {
-                final c = _classrooms[index];
-                return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: c['role'] == 'ADMIN'
-                          ? Colors.blue
-                          : Colors.grey.shade400,
-                      child: Icon(
-                        c['role'] == 'ADMIN' ? Icons.star : Icons.person,
-                        color: Colors.white,
-                      ),
-                    ),
-                    title: Text(
-                      c['className'],
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text('${c['faculty'] ?? ''} • ${c['academicYear'] ?? ''}'),
-                    trailing: Chip(
-                      label: Text(
-                        c['role'],
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ClassroomDetailScreen(
-                            classroomId: (c['id'] as num).toInt(),
-                            classroomName: c['className'] ?? '',
-                            inviteCode: c['inviteCode'],
-                            role: c['role'],
-                            faculty: c['faculty'],
-                            academicYear: c['academicYear'],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
+          Expanded(child: _buildBody()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const AppLoading();
+    }
+
+    if (_classrooms.isEmpty) {
+      return AppEmptyState(
+        icon: Icons.school_outlined,
+        title: 'Chưa có lớp học nào',
+        message:
+            'Tạo một lớp mới hoặc tham gia bằng mã mời để bắt đầu sử dụng ClassHub.',
+        actionLabel: 'Tạo lớp',
+        onAction: () => _navigateAndRefresh(const CreateClassroomScreen()),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenHorizontal,
+        AppSpacing.small,
+        AppSpacing.screenHorizontal,
+        AppSpacing.largeSection,
+      ),
+      itemCount: _classrooms.length,
+      separatorBuilder: (context, index) =>
+          const SizedBox(height: AppSpacing.element),
+      itemBuilder: (context, index) {
+        return _ClassroomTile(classroom: _classrooms[index]);
+      },
+    );
+  }
+}
+
+class _ClassroomTile extends StatelessWidget {
+  const _ClassroomTile({required this.classroom});
+
+  final dynamic classroom;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isAdmin = classroom['role'] == 'ADMIN';
+    final String faculty = (classroom['faculty'] as String?) ?? '';
+    final String year = (classroom['academicYear'] as String?) ?? '';
+    final String subtitleText = <String>[faculty, year]
+        .where((String s) => s.isNotEmpty)
+        .join(' • ');
+
+    return AppCard(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ClassroomDetailScreen(
+              classroomId: (classroom['id'] as num).toInt(),
+              classroomName: classroom['className'] ?? '',
+              inviteCode: classroom['inviteCode'],
+              role: classroom['role'],
+              faculty: classroom['faculty'],
+              academicYear: classroom['academicYear'],
             ),
           ),
+        );
+      },
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isAdmin
+                  ? AppColors.primary.withValues(alpha: 0.1)
+                  : AppColors.surfaceMuted,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              isAdmin ? Icons.star_rounded : Icons.person_outline,
+              size: 22,
+              color: isAdmin ? AppColors.primary : AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.element),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  classroom['className'] ?? '',
+                  style: AppTextStyles.subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (subtitleText.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.tiny),
+                  Text(
+                    subtitleText,
+                    style: AppTextStyles.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.small),
+          _RoleChip(isAdmin: isAdmin, role: classroom['role'] ?? ''),
         ],
+      ),
+    );
+  }
+}
+
+class _RoleChip extends StatelessWidget {
+  const _RoleChip({required this.isAdmin, required this.role});
+
+  final bool isAdmin;
+  final String role;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color background = isAdmin
+        ? AppColors.primary.withValues(alpha: 0.1)
+        : AppColors.surfaceMuted;
+    final Color foreground =
+        isAdmin ? AppColors.primary : AppColors.textSecondary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.element,
+        vertical: AppSpacing.tiny,
+      ),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(AppRadius.chip),
+      ),
+      child: Text(
+        role,
+        style: AppTextStyles.small.copyWith(
+          color: foreground,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
