@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_input.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/fund_service.dart';
 
@@ -48,7 +53,10 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
       Navigator.pop(context, true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(r['message'] ?? 'Tạo thất bại'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(r['message'] ?? 'Tạo thất bại'),
+          backgroundColor: AppColors.danger,
+        ),
       );
     }
   }
@@ -57,57 +65,66 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Thêm khoản chi')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _titleCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Tiêu đề *',
-                  hintText: 'VD: Mua nước cho buổi liên hoan',
-                  border: OutlineInputBorder(),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontal,
+            vertical: AppSpacing.largeSection,
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Khoản chi mới', style: AppTextStyles.heading),
+                const SizedBox(height: AppSpacing.small),
+                Text(
+                  'Ghi nhận một khoản đã chi từ quỹ lớp. Thông tin này sẽ hiện trong tab Khoản chi cho mọi thành viên.',
+                  style: AppTextStyles.caption,
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Nhập tiêu đề' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _amountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Số tiền (VNĐ) *',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: AppSpacing.largeSection),
+                AppInput(
+                  controller: _titleCtrl,
+                  label: 'Tiêu đề *',
+                  hint: 'VD: Mua nước cho buổi liên hoan',
+                  prefixIcon: const Icon(Icons.receipt_long_outlined),
+                  textInputAction: TextInputAction.next,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Nhập tiêu đề' : null,
                 ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Nhập số tiền';
-                  final n = double.tryParse(v.trim());
-                  if (n == null || n <= 0) return 'Số tiền phải > 0';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _reasonCtrl,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Lý do (tuỳ chọn)',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: AppSpacing.cardPadding),
+                AppInput(
+                  controller: _amountCtrl,
+                  label: 'Số tiền (VNĐ) *',
+                  hint: 'VD: 100000',
+                  prefixIcon: const Icon(Icons.payments_outlined),
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Nhập số tiền';
+                    final n = double.tryParse(v.trim());
+                    if (n == null || n <= 0) return 'Số tiền phải > 0';
+                    return null;
+                  },
                 ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
+                const SizedBox(height: AppSpacing.cardPadding),
+                AppInput(
+                  controller: _reasonCtrl,
+                  label: 'Lý do (tuỳ chọn)',
+                  hint: 'Mô tả ngắn lý do chi…',
+                  prefixIcon: const Icon(Icons.notes_outlined),
+                  maxLines: 3,
+                  textInputAction: TextInputAction.newline,
+                ),
+                const SizedBox(height: AppSpacing.largeSection),
+                AppButton(
+                  label: 'Thêm khoản chi',
+                  size: AppButtonSize.large,
+                  loading: _saving,
                   onPressed: _saving ? null : _submit,
-                  child: _saving
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Thêm khoản chi'),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

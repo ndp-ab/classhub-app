@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/formatters.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_input.dart';
+import '../../core/widgets/app_picker_field.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/fund_service.dart';
 
@@ -58,7 +65,10 @@ class _CreateCollectionScreenState extends State<CreateCollectionScreen> {
       Navigator.pop(context, true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(r['message'] ?? 'Tạo thất bại'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(r['message'] ?? 'Tạo thất bại'),
+          backgroundColor: AppColors.danger,
+        ),
       );
     }
   }
@@ -67,71 +77,66 @@ class _CreateCollectionScreenState extends State<CreateCollectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Tạo đợt thu mới')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _titleCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Tiêu đề *',
-                  hintText: 'VD: Quỹ lớp tháng 5',
-                  border: OutlineInputBorder(),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontal,
+            vertical: AppSpacing.largeSection,
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Đợt thu mới', style: AppTextStyles.heading),
+                const SizedBox(height: AppSpacing.small),
+                Text(
+                  'Tạo một đợt thu quỹ. Hệ thống sẽ tự sinh khoản đóng cho tất cả thành viên trong lớp.',
+                  style: AppTextStyles.caption,
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Nhập tiêu đề' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _amountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Số tiền (VNĐ) *',
-                  hintText: 'VD: 50000',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: AppSpacing.largeSection),
+                AppInput(
+                  controller: _titleCtrl,
+                  label: 'Tiêu đề *',
+                  hint: 'VD: Quỹ lớp tháng 5',
+                  prefixIcon: const Icon(Icons.payments_outlined),
+                  textInputAction: TextInputAction.next,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Nhập tiêu đề' : null,
                 ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Nhập số tiền';
-                  final n = double.tryParse(v.trim());
-                  if (n == null || n <= 0) return 'Số tiền phải > 0';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              InkWell(
-                onTap: _pickDeadline,
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Hạn đóng (tuỳ chọn)',
-                    border: OutlineInputBorder(),
-                    suffixIcon: Icon(Icons.calendar_today),
-                  ),
-                  child: Text(
-                    _deadline == null
-                        ? 'Chưa chọn'
-                        : '${_deadline!.day.toString().padLeft(2, '0')}/${_deadline!.month.toString().padLeft(2, '0')}/${_deadline!.year}',
-                  ),
+                const SizedBox(height: AppSpacing.cardPadding),
+                AppInput(
+                  controller: _amountCtrl,
+                  label: 'Số tiền (VNĐ) *',
+                  hint: 'VD: 50000',
+                  prefixIcon: const Icon(Icons.attach_money_outlined),
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Nhập số tiền';
+                    final n = double.tryParse(v.trim());
+                    if (n == null || n <= 0) return 'Số tiền phải > 0';
+                    return null;
+                  },
                 ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
+                const SizedBox(height: AppSpacing.cardPadding),
+                AppPickerField(
+                  label: 'Hạn đóng (tuỳ chọn)',
+                  value: formatDate(_deadline),
+                  placeholder: 'Chưa chọn',
+                  prefixIcon: const Icon(Icons.calendar_today_outlined),
+                  suffixIcon: const Icon(Icons.chevron_right),
+                  onTap: _pickDeadline,
+                ),
+                const SizedBox(height: AppSpacing.largeSection),
+                AppButton(
+                  label: 'Tạo đợt thu',
+                  size: AppButtonSize.large,
+                  loading: _saving,
                   onPressed: _saving ? null : _submit,
-                  child: _saving
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Tạo đợt thu'),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Sau khi tạo, hệ thống sẽ tự sinh khoản đóng cho tất cả thành viên.',
-                style: TextStyle(color: Colors.grey, fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

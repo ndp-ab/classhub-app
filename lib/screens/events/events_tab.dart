@@ -185,9 +185,14 @@ class _EventsTabState extends State<EventsTab> {
                                         Icon(Icons.people,
                                             size: 16, color: Colors.grey.shade700),
                                         const SizedBox(width: 4),
-                                        Text(
+                                        Flexible(
+                                          child: Text(
                                             'Đăng ký: ${e.volunteerCount}  •  Check-in: ${e.checkedInCount}',
-                                            style: TextStyle(color: Colors.grey.shade700)),
+                                            style: TextStyle(color: Colors.grey.shade700),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
                                         const Spacer(),
                                         if (widget.isAdmin)
                                           TextButton.icon(
