@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/formatters.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_input.dart';
+import '../../core/widgets/app_picker_field.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/event_service.dart';
 
@@ -43,14 +50,18 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       initialTime: TimeOfDay.fromDateTime(_eventTime ?? now),
     );
     if (t == null) return;
-    setState(() => _eventTime = DateTime(d.year, d.month, d.day, t.hour, t.minute));
+    setState(() =>
+        _eventTime = DateTime(d.year, d.month, d.day, t.hour, t.minute));
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_eventTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn thời gian'), backgroundColor: Colors.red),
+        SnackBar(
+          content: const Text('Vui lòng chọn thời gian'),
+          backgroundColor: AppColors.danger,
+        ),
       );
       return;
     }
@@ -73,77 +84,81 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       Navigator.pop(context, true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(r['message'] ?? 'Tạo thất bại'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(r['message'] ?? 'Tạo thất bại'),
+          backgroundColor: AppColors.danger,
+        ),
       );
     }
-  }
-
-  String _fmtDateTime(DateTime d) {
-    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year} '
-        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Tạo sự kiện')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _titleCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Tên sự kiện *',
-                  hintText: 'VD: Hoạt động tình nguyện',
-                  border: OutlineInputBorder(),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontal,
+            vertical: AppSpacing.largeSection,
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Sự kiện mới', style: AppTextStyles.heading),
+                const SizedBox(height: AppSpacing.small),
+                Text(
+                  'Tạo một sự kiện cho lớp. Sinh viên có thể đăng ký tham gia, ban cán sự có thể check-in trong ngày.',
+                  style: AppTextStyles.caption,
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Nhập tên sự kiện' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descCtrl,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Mô tả (tuỳ chọn)',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: AppSpacing.largeSection),
+                AppInput(
+                  controller: _titleCtrl,
+                  label: 'Tên sự kiện *',
+                  hint: 'VD: Hoạt động tình nguyện',
+                  prefixIcon: const Icon(Icons.event_outlined),
+                  textInputAction: TextInputAction.next,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Nhập tên sự kiện'
+                      : null,
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _locationCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Địa điểm (tuỳ chọn)',
-                  prefixIcon: Icon(Icons.location_on_outlined),
-                  border: OutlineInputBorder(),
+                const SizedBox(height: AppSpacing.cardPadding),
+                AppInput(
+                  controller: _descCtrl,
+                  label: 'Mô tả (tuỳ chọn)',
+                  hint: 'Nội dung, mục tiêu, ghi chú…',
+                  prefixIcon: const Icon(Icons.notes_outlined),
+                  maxLines: 3,
+                  textInputAction: TextInputAction.newline,
                 ),
-              ),
-              const SizedBox(height: 16),
-              InkWell(
-                onTap: _pickDateTime,
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Thời gian *',
-                    border: OutlineInputBorder(),
-                    suffixIcon: Icon(Icons.calendar_today),
-                  ),
-                  child: Text(_eventTime == null ? 'Chưa chọn' : _fmtDateTime(_eventTime!)),
+                const SizedBox(height: AppSpacing.cardPadding),
+                AppInput(
+                  controller: _locationCtrl,
+                  label: 'Địa điểm (tuỳ chọn)',
+                  hint: 'VD: Hội trường A2',
+                  prefixIcon: const Icon(Icons.location_on_outlined),
+                  textInputAction: TextInputAction.next,
                 ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
+                const SizedBox(height: AppSpacing.cardPadding),
+                AppPickerField(
+                  label: 'Thời gian *',
+                  value: formatDateTime(_eventTime),
+                  placeholder: 'Chưa chọn ngày & giờ',
+                  prefixIcon: const Icon(Icons.schedule_outlined),
+                  suffixIcon: const Icon(Icons.chevron_right),
+                  onTap: _pickDateTime,
+                ),
+                const SizedBox(height: AppSpacing.largeSection),
+                AppButton(
+                  label: 'Tạo sự kiện',
+                  size: AppButtonSize.large,
+                  loading: _saving,
                   onPressed: _saving ? null : _submit,
-                  child: _saving
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Tạo sự kiện'),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
