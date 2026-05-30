@@ -194,7 +194,7 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
               child: Image.network(
                 qrUrl,
                 height: 280,
-                errorBuilder: (_, __, ___) => const SizedBox(
+                errorBuilder: (_, _, _) => const SizedBox(
                   height: 280,
                   child: Center(child: Text('Không tải được QR')),
                 ),
@@ -279,7 +279,7 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color),
       ),

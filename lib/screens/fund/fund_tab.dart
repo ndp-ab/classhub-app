@@ -145,7 +145,7 @@ class _FundTabState extends State<FundTab> {
     final pending = _myPayments.where((p) => p.isPending).toList();
     final confirmed = _myPayments.where((p) => p.isConfirmed).toList();
 
-    String _subtitle(p) {
+    String subtitle(p) {
       if (p.amount == null) return '';
       final money = _fmtAmount(p.amount!);
       final hasDeadline = p.deadline != null;
@@ -174,7 +174,7 @@ class _FundTabState extends State<FundTab> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.error_outline, color: Colors.orange),
                     title: Text(p.collectionTitle ?? 'Khoản #${p.id}'),
-                    subtitle: Text(_subtitle(p)),
+                    subtitle: Text(subtitle(p)),
                     trailing: TextButton.icon(
                       icon: const Icon(Icons.qr_code),
                       label: const Text('Xem QR'),
@@ -194,7 +194,7 @@ class _FundTabState extends State<FundTab> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.hourglass_top, color: Colors.blue),
                     title: Text(p.collectionTitle ?? 'Khoản #${p.id}'),
-                    subtitle: Text('${_subtitle(p)}\nĐã báo CK — chờ Admin xác nhận'),
+                    subtitle: Text('${subtitle(p)}\nĐã báo CK — chờ Admin xác nhận'),
                     isThreeLine: true,
                     trailing: TextButton.icon(
                       icon: const Icon(Icons.qr_code),
