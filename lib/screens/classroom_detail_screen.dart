@@ -663,16 +663,15 @@ class _FundWorkspaceTabState extends State<_FundWorkspaceTab> {
           ),
         ),
         Expanded(
-          child: IndexedStack(
-            index: _selectedIndex,
-            children: [
-              FundTab(classroomId: widget.classroomId, isAdmin: widget.isAdmin),
-              ExpensesScreen(
-                classroomId: widget.classroomId,
-                isAdmin: widget.isAdmin,
-              ),
-            ],
-          ),
+          child: _selectedIndex == 0
+              ? FundTab(
+                  classroomId: widget.classroomId,
+                  isAdmin: widget.isAdmin,
+                )
+              : ExpensesScreen(
+                  classroomId: widget.classroomId,
+                  isAdmin: widget.isAdmin,
+                ),
         ),
       ],
     );
