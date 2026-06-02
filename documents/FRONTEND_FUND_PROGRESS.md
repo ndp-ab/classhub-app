@@ -143,8 +143,8 @@ Login → Home (danh sách lớp)
 - ❌ **Sửa/xoá** collection / event / expense — BE chưa có `PUT/DELETE`. Tạo nhầm thì stuck.
 
 ### Role
-- ✅ **Đã giải quyết:** BE trả `role` (`ADMIN`/`MEMBER`) trong `/api/classrooms/my`. FE truyền qua constructor `ClassroomDetailScreen.role`, check `_isAdmin = role == 'ADMIN' || role == 'OWNER'`.
-- ⚠️ Nếu BE sau này thêm cấp `OWNER` thì FE đã forward-compat.
+- ✅ **Đã giải quyết:** BE trả `role` (`ADMIN`/`MEMBER`) trong `/api/classrooms/my`. FE truyền qua constructor `ClassroomDetailScreen.role`, check quyền qua `UserRoles.isAdminLike(role)`.
+- ⚠️ `OWNER` chưa có trong BE/FE hiện tại, chỉ là hướng mở rộng sau này.
 
 ### QR response
 - ✅ **Đã rõ:** BE trả `qrUrl` (VietQR), `amount`, `paymentCode`, `collectionTitle`, `deadline`. FE hiển thị đầy đủ.
@@ -170,7 +170,7 @@ Login → Home (danh sách lớp)
 | # | Rủi ro | Mức độ | Ghi chú |
 |---|---|---|---|
 | 1 | **Token** đã lưu đúng ở `SharedPreferences` (key `jwt_token`). Tất cả service gửi `Authorization: Bearer`. | ✅ OK | Không còn `X-User-Id` |
-| 2 | **Role check** hard-code `'ADMIN'` / `'OWNER'`. BE hiện chỉ trả `'ADMIN'` hoặc `'MEMBER'`. | ✅ OK | Nhưng nếu BE đổi case (`'admin'`) thì sai |
+| 2 | **Role check** gom ở `UserRoles` (`ADMIN`/`MEMBER`). | ✅ OK | `OWNER` chỉ là hướng mở rộng, chưa nằm trong logic hiện tại |
 | 3 | **Response JSON không khớp model** — Lombok+Jackson có thể serialize `isPaid` thành `paid`. | ✅ Đã xử lý | `Payment.fromJson` parse cả 2: `json['isPaid'] ?? json['paid']` |
 | 4 | **Polling QR 5s** — đã `dispose()` timer khi thoát màn. Mất mạng → fail silent (không update state). | ⚠️ Chấp nhận được | Không gây crash; chỉ không update |
 | 5 | **`eventTime` format** — gửi ISO không có `Z` (`2026-05-20T18:00:00`). BE nhận `LocalDateTime` (no TZ). | ⚠️ | Thiết bị test khác múi giờ có thể lệch giờ |
