@@ -1,14 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/config/app_config.dart';
 import '../models/event.dart';
 
 /// Service cho phân hệ Sự kiện (Event).
 ///
 /// Sau B1 backend xác thực bằng `Authorization: Bearer <token>` (JwtAuthenticationFilter).
 class EventService {
-  //static const String baseUrl = 'http://192.168.1.5:8080/api';
-  static const String baseUrl = 'http://localhost:8080/api';
+  static const String baseUrl = AppConfig.baseUrl;
 
   Future<Map<String, String>> _headers(int userId, {bool json = false}) async {
     final prefs = await SharedPreferences.getInstance();

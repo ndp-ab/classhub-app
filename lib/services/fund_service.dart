@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/config/app_config.dart';
 import '../models/expense.dart';
 import '../models/fund_collection.dart';
 import '../models/payment.dart';
@@ -11,8 +12,7 @@ import '../models/payment.dart';
 /// Tham số `userId` giữ trong signature để tương thích UI cũ — BE lấy userId
 /// từ token, không dùng `X-User-Id` nữa.
 class FundService {
-  //static const String baseUrl = 'http://192.168.1.5:8080/api';
-  static const String baseUrl = 'http://localhost:8080/api';
+  static const String baseUrl = AppConfig.baseUrl;
 
   Future<Map<String, String>> _headers(int userId, {bool json = false}) async {
     final prefs = await SharedPreferences.getInstance();

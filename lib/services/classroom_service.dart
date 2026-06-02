@@ -2,13 +2,14 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/config/app_config.dart';
+
 /// Service cho phân hệ Lớp học.
 /// Sau B1 (JWT filter), backend đã yêu cầu `Authorization: Bearer <token>`
 /// thay vì `X-User-Id`. Tham số userId vẫn giữ trong signature để tránh đổi UI,
 /// nhưng KHÔNG còn được gửi qua header.
 class ClassroomService {
-  //static const String baseUrl = 'http://192.168.1.5:8080/api';
-  static const String baseUrl = 'http://localhost:8080/api';
+  static const String baseUrl = AppConfig.baseUrl;
 
   Future<Map<String, String>> _headers({bool json = false}) async {
     final prefs = await SharedPreferences.getInstance();

@@ -161,7 +161,7 @@ Login → Home (danh sách lớp)
 - Format tiền bằng `intl` package thay vì hardcode (hiện format thủ công `"50.000 đ"`).
 - Badge số khoản nợ chưa đóng trên card lớp ở Home.
 - Loading skeleton thay `CircularProgressIndicator`.
-- Test thiết bị thật / emulator Android (đổi `baseUrl` → `http://10.0.2.2:8080/api`).
+- Test thiết bị thật / emulator Android bằng `--dart-define=API_BASE_URL=...`.
 
 ---
 
@@ -177,7 +177,7 @@ Login → Home (danh sách lớp)
 | 6 | **`qrUrl` `Image.network`** — nếu mất mạng → có `errorBuilder` fallback "Không tải được QR" | ✅ OK | |
 | 7 | **Confirm dialog** đã thêm cho 2 action destructive (xác nhận / check-in) | ✅ OK | Chống lỡ tay |
 | 8 | **Lỗi 401** từ BE (token hết hạn) — service chỉ hiện "Bạn không có quyền (401)". FE không tự động redirect về Login. | ⚠️ | Để post-demo |
-| 9 | **`baseUrl` hardcode** `http://localhost:8080/api` ở 4 service. | ⚠️ | Phải đổi tay khi test emulator/device |
+| 9 | **`baseUrl` tập trung** ở `lib/core/config/app_config.dart`. | ✅ OK | Override bằng `--dart-define=API_BASE_URL=...` khi test emulator/device |
 
 ---
 
@@ -197,21 +197,20 @@ flutter pub get
 flutter run
 ```
 
-### Đổi `baseUrl` tuỳ thiết bị test
-4 file phải đổi cùng nhau:
-- `lib/services/auth_service.dart`
-- `lib/services/classroom_service.dart`
-- `lib/services/fund_service.dart`
-- `lib/services/event_service.dart`
+### Cấu hình `baseUrl` tuỳ thiết bị test
+`baseUrl` được quản lý tập trung ở `lib/core/config/app_config.dart`, mặc định là `http://localhost:8080/api`.
 
 Tuỳ thiết bị:
-| Thiết bị | baseUrl |
+| Thiết bị | Cách chạy |
 |---|---|
-| Chrome web / Windows desktop | `http://localhost:8080/api` |
-| Android emulator | `http://10.0.2.2:8080/api` |
-| Thiết bị Android thật (cùng LAN) | `http://<IP-máy-tính>:8080/api` (vd `192.168.1.5`) |
+| Chrome web / Windows desktop | `flutter run` |
+| Android emulator | `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api` |
+| Thiết bị Android thật (cùng LAN) | `flutter run --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api` |
 
-> Trong code có sẵn dòng comment `http://192.168.1.5:8080/api` để switch nhanh.
+Build APK demo:
+```bash
+flutter build apk --release --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api
+```
 
 ### Tài khoản test
 Chưa có seed. **Tự tạo 2 tài khoản** qua màn `signup_screen`:
