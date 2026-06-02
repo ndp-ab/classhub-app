@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/constants/user_roles.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -161,7 +162,7 @@ class _ClassroomTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isAdmin = classroom['role'] == 'ADMIN';
+    final bool isAdmin = UserRoles.isAdminLike(classroom['role'] as String?);
     final String faculty = (classroom['faculty'] as String?) ?? '';
     final String year = (classroom['academicYear'] as String?) ?? '';
     final String subtitleText = <String>[faculty, year]

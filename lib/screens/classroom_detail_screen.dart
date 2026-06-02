@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../core/constants/user_roles.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -41,7 +42,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> {
   int _fundModuleVersion = 0;
   int _eventModuleVersion = 0;
 
-  bool get _isAdmin => widget.role == 'ADMIN' || widget.role == 'OWNER';
+  bool get _isAdmin => UserRoles.isAdminLike(widget.role);
 
   void _showComingSoon(String message) {
     ScaffoldMessenger.of(
