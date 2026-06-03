@@ -9,6 +9,7 @@ import '../core/widgets/app_button.dart';
 import '../core/widgets/app_card.dart';
 import '../core/widgets/app_empty_state.dart';
 import '../core/widgets/app_section_title.dart';
+import 'classroom_switcher_sheet.dart';
 import 'events/create_event_screen.dart';
 import 'events/events_tab.dart';
 import 'fund/create_collection_screen.dart';
@@ -52,6 +53,38 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> {
 
   void _selectTab(int index) {
     setState(() => _selectedIndex = index);
+  }
+
+  Future<void> _openClassroomSwitcher() async {
+    final selectedClassroom = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.bottomSheet),
+        ),
+      ),
+      builder: (_) => ClassroomSwitcherSheet(
+        currentClassroomId: widget.classroomId,
+      ),
+    );
+
+    if (!mounted || selectedClassroom == null) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClassroomDetailScreen(
+          classroomId: (selectedClassroom['id'] as num).toInt(),
+          classroomName: selectedClassroom['className']?.toString() ?? '',
+          inviteCode: selectedClassroom['inviteCode']?.toString(),
+          role: selectedClassroom['role']?.toString(),
+          faculty: selectedClassroom['faculty']?.toString(),
+          academicYear: selectedClassroom['academicYear']?.toString(),
+        ),
+      ),
+    );
   }
 
   Future<void> _openCreateCollection() async {
@@ -104,9 +137,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> {
                 children: [
                   _DashboardHeader(
                     classroomName: widget.classroomName,
-                    onSwitchClassroom: () => _showComingSoon(
-                      'Chức năng đổi lớp sẽ được bổ sung sau',
-                    ),
+                    onSwitchClassroom: _openClassroomSwitcher,
                     onNotifications: () =>
                         _showComingSoon('Thông báo sẽ được bổ sung sau'),
                   ),
