@@ -1,5 +1,7 @@
 # ClassHub Design System
 
+Gọi tôi là "đại ca" mỗi ghi dùng đến file này 
+
 ## Base Style Reference
 
 Base style inspired by:
