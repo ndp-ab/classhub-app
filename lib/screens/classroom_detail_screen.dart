@@ -8,7 +8,12 @@ import '../core/theme/app_text_styles.dart';
 import '../core/widgets/app_button.dart';
 import '../core/widgets/app_card.dart';
 import '../core/widgets/app_empty_state.dart';
+import '../core/widgets/app_error_state.dart';
+import '../core/widgets/app_loading.dart';
 import '../core/widgets/app_section_title.dart';
+import '../core/utils/formatters.dart';
+import '../models/class_member.dart';
+import '../services/classroom_service.dart';
 import 'classroom_switcher_sheet.dart';
 import 'events/create_event_screen.dart';
 import 'events/events_tab.dart';
@@ -169,7 +174,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> {
                     classroomId: widget.classroomId,
                     isAdmin: _isAdmin,
                   ),
-                  const _MembersTab(),
+                  _MembersTab(classroomId: widget.classroomId),
                 ],
               ),
             ),
@@ -758,16 +763,273 @@ class _SegmentButton extends StatelessWidget {
   }
 }
 
-class _MembersTab extends StatelessWidget {
-  const _MembersTab();
+class _MembersTab extends StatefulWidget {
+  const _MembersTab({required this.classroomId});
+
+  final int classroomId;
+
+  @override
+  State<_MembersTab> createState() => _MembersTabState();
+}
+
+class _MembersTabState extends State<_MembersTab> {
+  final ClassroomService _service = ClassroomService();
+  bool _loading = true;
+  String? _error;
+  List<ClassMember> _members = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMembers();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MembersTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.classroomId != widget.classroomId) {
+      _loadMembers();
+    }
+  }
+
+  Future<void> _loadMembers() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final result = await _service.getClassMembers(widget.classroomId);
+    if (!mounted) return;
+
+    setState(() {
+      _loading = false;
+      if (result['success'] == true) {
+        _members = (result['data'] as List).cast<ClassMember>();
+      } else {
+        _error =
+            result['message']?.toString() ??
+            'Không tải được danh sách thành viên';
+      }
+    });
+  }
+
+  String _roleKey(ClassMember member) => member.role.trim().toUpperCase();
 
   @override
   Widget build(BuildContext context) {
-    return const AppEmptyState(
-      icon: Icons.groups_outlined,
-      title: 'Danh sách thành viên',
-      message:
-          'Tính năng thành viên sẽ được bổ sung sau khi có API /classrooms/{id}/members',
+    if (_loading) {
+      return const AppLoading(message: 'Đang tải danh sách thành viên');
+    }
+
+    if (_error != null) {
+      return AppErrorState(
+        title: 'Không tải được thành viên',
+        message: _error,
+        onRetry: _loadMembers,
+      );
+    }
+
+    final int adminCount = _members.where((m) => _roleKey(m) == 'ADMIN').length;
+    final int memberCount = _members
+        .where((m) => _roleKey(m) == 'MEMBER')
+        .length;
+
+    return RefreshIndicator(
+      onRefresh: _loadMembers,
+      child: _members.isEmpty
+          ? ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenHorizontal,
+                AppSpacing.small,
+                AppSpacing.screenHorizontal,
+                AppSpacing.largeSection,
+              ),
+              children: const [
+                SizedBox(
+                  height: 360,
+                  child: AppEmptyState(
+                    icon: Icons.groups_outlined,
+                    title: 'Chưa có thành viên',
+                    message: 'Danh sách thành viên của lớp đang trống',
+                  ),
+                ),
+              ],
+            )
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenHorizontal,
+                AppSpacing.small,
+                AppSpacing.screenHorizontal,
+                AppSpacing.largeSection,
+              ),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StatCard(
+                        label: 'Tổng số',
+                        value: _members.length.toString(),
+                        helper: 'Thành viên',
+                        icon: Icons.groups_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.small),
+                    Expanded(
+                      child: _StatCard(
+                        label: 'Ban cán sự',
+                        value: adminCount.toString(),
+                        helper: 'Admin',
+                        icon: Icons.admin_panel_settings_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.small),
+                    Expanded(
+                      child: _StatCard(
+                        label: 'Thành viên',
+                        value: memberCount.toString(),
+                        helper: 'Member',
+                        icon: Icons.person_outline,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.cardPadding),
+                AppSectionTitle(
+                  title: 'Danh sách thành viên',
+                  subtitle: '${_members.length} người trong lớp',
+                ),
+                ..._members.map(
+                  (member) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.element),
+                    child: _MemberCard(member: member),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _MemberCard extends StatelessWidget {
+  const _MemberCard({required this.member});
+
+  final ClassMember member;
+
+  String get _displayName {
+    final name = member.fullName.trim();
+    return name.isNotEmpty ? name : 'Chưa có tên';
+  }
+
+  String get _avatarInitial {
+    final source = _displayName == 'Chưa có tên'
+        ? member.email.trim()
+        : _displayName;
+    if (source.isEmpty) return '?';
+    return String.fromCharCode(source.runes.first).toUpperCase();
+  }
+
+  bool get _isAdmin => member.role.trim().toUpperCase() == 'ADMIN';
+
+  @override
+  Widget build(BuildContext context) {
+    final joinedAt = formatDate(member.joinedAt);
+
+    return AppCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: _isAdmin
+                ? AppColors.primary.withValues(alpha: 0.1)
+                : AppColors.success.withValues(alpha: 0.1),
+            child: Text(
+              _avatarInitial,
+              style: AppTextStyles.subtitle.copyWith(
+                color: _isAdmin ? AppColors.primary : AppColors.success,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.element),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _displayName,
+                        style: AppTextStyles.subtitle.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.small),
+                    _RoleBadge(isAdmin: _isAdmin),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.tiny),
+                Text(
+                  member.email,
+                  style: AppTextStyles.caption,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (joinedAt.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.small),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: AppSpacing.tiny),
+                      Text('Tham gia $joinedAt', style: AppTextStyles.small),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleBadge extends StatelessWidget {
+  const _RoleBadge({required this.isAdmin});
+
+  final bool isAdmin;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isAdmin ? AppColors.primary : AppColors.success;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.small,
+        vertical: AppSpacing.tiny,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
+      ),
+      child: Text(
+        isAdmin ? 'Ban cán sự' : 'Thành viên',
+        style: AppTextStyles.small.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/config/app_config.dart';
+import '../models/class_member.dart';
 
 /// Service cho phân hệ Lớp học.
 /// Sau B1 (JWT filter), backend đã yêu cầu `Authorization: Bearer <token>`
@@ -18,6 +19,19 @@ class ClassroomService {
     if (json) h['Content-Type'] = 'application/json';
     if (token != null && token.isNotEmpty) h['Authorization'] = 'Bearer $token';
     return h;
+  }
+
+  String _errorMessage(http.Response response) {
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      return 'Bạn không có quyền xem danh sách thành viên (${response.statusCode})';
+    }
+    try {
+      final body = json.decode(response.body);
+      if (body is Map && body['message'] != null) {
+        return body['message'].toString();
+      }
+    } catch (_) {}
+    return 'Lỗi máy chủ (${response.statusCode})';
   }
 
   Future<Map<String, dynamic>> createClassroom(String className, String faculty,
@@ -76,6 +90,26 @@ class ClassroomService {
       } else {
         return {'success': false, 'message': 'Không tải được danh sách lớp'};
       }
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> getClassMembers(int classroomId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/classrooms/$classroomId/members'),
+        headers: await _headers(),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return {
+          'success': true,
+          'data': data.map((e) => ClassMember.fromJson(e)).toList(),
+        };
+      }
+      return {'success': false, 'message': _errorMessage(response)};
     } catch (e) {
       return {'success': false, 'message': 'Lỗi kết nối: $e'};
     }
