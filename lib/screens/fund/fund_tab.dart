@@ -123,6 +123,7 @@ class _FundTabState extends State<FundTab> {
       ),
       floatingActionButton: widget.isAdmin
           ? FloatingActionButton.extended(
+              heroTag: 'fund_create_collection_fab',
               onPressed: () async {
                 final ok = await Navigator.push<bool>(
                   context,

@@ -80,6 +80,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       body: _buildBody(),
       floatingActionButton: widget.isAdmin
           ? FloatingActionButton.extended(
+              heroTag: 'expenses_create_expense_fab',
               onPressed: _openCreateExpense,
               icon: const Icon(Icons.add),
               label: const Text('Thêm khoản chi'),

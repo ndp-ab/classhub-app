@@ -56,10 +56,10 @@ class _EventsTabState extends State<EventsTab> {
       }
       if (my['success']) {
         final list = (my['data'] as List).cast<EventParticipant>();
-        // B4: BE trả eventId trong EventParticipantResponse → match chuẩn
+        // Chỉ lấy những bản ghi có eventId hợp lệ (không null)
         _myEventIds = list
             .where((p) => p.eventId != null)
-            .map((p) => p.eventId!)
+            .map((p) => p.eventId as int)
             .toSet();
       }
     });
@@ -91,7 +91,7 @@ class _EventsTabState extends State<EventsTab> {
   }
 
   String _fmtDateTime(DateTime? d) {
-    if (d == null) return '';
+    if (d == null) return 'Chưa có thời gian';
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year} '
         '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
@@ -153,10 +153,10 @@ class _EventsTabState extends State<EventsTab> {
                                           ),
                                       ],
                                     ),
-                                    if (e.description != null && e.description!.isNotEmpty)
+                                    if (e.description?.isNotEmpty == true)
                                       Padding(
                                         padding: const EdgeInsets.only(top: 4),
-                                        child: Text(e.description!),
+                                        child: Text(e.description ?? ''),
                                       ),
                                     const SizedBox(height: 8),
                                     Row(
@@ -168,14 +168,14 @@ class _EventsTabState extends State<EventsTab> {
                                             style: const TextStyle(color: Colors.grey)),
                                       ],
                                     ),
-                                    if (e.location != null && e.location!.isNotEmpty)
+                                    if (e.location?.isNotEmpty == true)
                                       Row(
                                         children: [
                                           const Icon(Icons.location_on,
                                               size: 14, color: Colors.grey),
                                           const SizedBox(width: 4),
                                           Expanded(
-                                              child: Text(e.location!,
+                                              child: Text(e.location ?? '',
                                                   style: const TextStyle(color: Colors.grey))),
                                         ],
                                       ),
@@ -234,6 +234,7 @@ class _EventsTabState extends State<EventsTab> {
                 ),
       floatingActionButton: widget.isAdmin
           ? FloatingActionButton.extended(
+              heroTag: 'events_create_event_fab',
               onPressed: () async {
                 final ok = await Navigator.push<bool>(
                   context,
