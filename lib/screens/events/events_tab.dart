@@ -106,7 +106,8 @@ class _EventsTabState extends State<EventsTab> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
+                      Text(_error ?? 'Đã xảy ra lỗi',
+                          style: const TextStyle(color: Colors.red)),
                       const SizedBox(height: 8),
                       ElevatedButton(onPressed: _load, child: const Text('Thử lại')),
                     ],
@@ -130,6 +131,12 @@ class _EventsTabState extends State<EventsTab> {
                           itemBuilder: (_, i) {
                             final e = _events[i];
                             final joined = _myEventIds.contains(e.id);
+                            final title = e.title.trim().isNotEmpty
+                                ? e.title.trim()
+                                : 'Sự kiện không tên';
+                            final description = e.description?.trim();
+                            final location = e.location?.trim();
+                            final eventTimeText = _fmtDateTime(e.eventTime);
                             return Card(
                               child: Padding(
                                 padding: const EdgeInsets.all(12),
@@ -141,7 +148,7 @@ class _EventsTabState extends State<EventsTab> {
                                         const Icon(Icons.event, color: Colors.blue),
                                         const SizedBox(width: 8),
                                         Expanded(
-                                          child: Text(e.title,
+                                          child: Text(title,
                                               style: const TextStyle(
                                                   fontSize: 16, fontWeight: FontWeight.bold)),
                                         ),
@@ -153,10 +160,10 @@ class _EventsTabState extends State<EventsTab> {
                                           ),
                                       ],
                                     ),
-                                    if (e.description?.isNotEmpty == true)
+                                    if (description != null && description.isNotEmpty)
                                       Padding(
                                         padding: const EdgeInsets.only(top: 4),
-                                        child: Text(e.description ?? ''),
+                                        child: Text(description),
                                       ),
                                     const SizedBox(height: 8),
                                     Row(
@@ -164,18 +171,18 @@ class _EventsTabState extends State<EventsTab> {
                                         const Icon(Icons.access_time,
                                             size: 14, color: Colors.grey),
                                         const SizedBox(width: 4),
-                                        Text(_fmtDateTime(e.eventTime),
+                                        Text(eventTimeText,
                                             style: const TextStyle(color: Colors.grey)),
                                       ],
                                     ),
-                                    if (e.location?.isNotEmpty == true)
+                                    if (location != null && location.isNotEmpty)
                                       Row(
                                         children: [
                                           const Icon(Icons.location_on,
                                               size: 14, color: Colors.grey),
                                           const SizedBox(width: 4),
                                           Expanded(
-                                              child: Text(e.location ?? '',
+                                              child: Text(location,
                                                   style: const TextStyle(color: Colors.grey))),
                                         ],
                                       ),
@@ -185,7 +192,7 @@ class _EventsTabState extends State<EventsTab> {
                                         Icon(Icons.people,
                                             size: 16, color: Colors.grey.shade700),
                                         const SizedBox(width: 4),
-                                        Flexible(
+                                        Expanded(
                                           child: Text(
                                             'Đăng ký: ${e.volunteerCount}  •  Check-in: ${e.checkedInCount}',
                                             style: TextStyle(color: Colors.grey.shade700),
@@ -193,37 +200,43 @@ class _EventsTabState extends State<EventsTab> {
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
-                                        const Spacer(),
-                                        if (widget.isAdmin)
-                                          TextButton.icon(
-                                            icon: const Icon(Icons.checklist),
-                                            label: const Text('Người tham gia'),
-                                            onPressed: () async {
-                                              await Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) => EventParticipantsScreen(
-                                                    eventId: e.id,
-                                                    eventTitle: e.title,
-                                                    isAdmin: widget.isAdmin,
-                                                  ),
-                                                ),
-                                              );
-                                              _load();
-                                            },
-                                          )
-                                        else
-                                          ElevatedButton.icon(
-                                            icon: Icon(joined
-                                                ? Icons.cancel_outlined
-                                                : Icons.how_to_reg),
-                                            label: Text(joined ? 'Huỷ đăng ký' : 'Đăng ký'),
-                                            onPressed: () => _toggleVolunteer(e),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: joined ? Colors.orange : null,
-                                            ),
-                                          ),
                                       ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: widget.isAdmin
+                                          ? TextButton.icon(
+                                              icon: const Icon(Icons.checklist),
+                                              label: const Text('Người tham gia'),
+                                              style: TextButton.styleFrom(
+                                                minimumSize: const Size(0, 48),
+                                              ),
+                                              onPressed: () async {
+                                                await Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) => EventParticipantsScreen(
+                                                      eventId: e.id,
+                                                      eventTitle: title,
+                                                      isAdmin: widget.isAdmin,
+                                                    ),
+                                                  ),
+                                                );
+                                                _load();
+                                              },
+                                            )
+                                          : ElevatedButton.icon(
+                                              icon: Icon(joined
+                                                  ? Icons.cancel_outlined
+                                                  : Icons.how_to_reg),
+                                              label: Text(joined ? 'Huỷ đăng ký' : 'Đăng ký'),
+                                              onPressed: () => _toggleVolunteer(e),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: joined ? Colors.orange : null,
+                                                minimumSize: const Size(0, 48),
+                                              ),
+                                            ),
                                     ),
                                   ],
                                 ),
