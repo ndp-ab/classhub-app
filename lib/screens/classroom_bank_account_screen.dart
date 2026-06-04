@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/constants/vietnam_banks.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_text_styles.dart';
@@ -24,13 +25,14 @@ class ClassroomBankAccountScreen extends StatefulWidget {
 class _ClassroomBankAccountScreenState
     extends State<ClassroomBankAccountScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _bankNameCtrl = TextEditingController();
-  final _bankBinCtrl = TextEditingController();
   final _accountNoCtrl = TextEditingController();
   final _accountNameCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   final _service = ClassroomService();
 
+  BankItem? _selectedBank;
+  String? _unknownBankName; // Lưu tên ngân hàng từ BE nếu không match
+  
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -43,8 +45,6 @@ class _ClassroomBankAccountScreenState
 
   @override
   void dispose() {
-    _bankNameCtrl.dispose();
-    _bankBinCtrl.dispose();
     _accountNoCtrl.dispose();
     _accountNameCtrl.dispose();
     _noteCtrl.dispose();
@@ -75,17 +75,51 @@ class _ClassroomBankAccountScreenState
   }
 
   void _fillForm(ClassroomBankAccount account) {
-    _bankNameCtrl.text = account.bankName;
-    _bankBinCtrl.text = account.bankBin;
+    // Tìm ngân hàng trong list local bằng bankBin
+    final matchedBank = vietnameseBanks.firstWhere(
+      (bank) => bank.bankBin == account.bankBin,
+      orElse: () => vietnameseBanks.firstWhere(
+        (bank) => bank.bankName == account.bankName || bank.shortName == account.bankName,
+        orElse: () => const BankItem(bankName: '', shortName: '', bankBin: ''),
+      ),
+    );
+
+    if (matchedBank.bankBin.isNotEmpty) {
+      // Match found
+      _selectedBank = matchedBank;
+      _unknownBankName = null;
+    } else {
+      // Không match - lưu lại để hiển thị warning
+      _selectedBank = null;
+      _unknownBankName = account.bankName;
+    }
+
     _accountNoCtrl.text = account.accountNo;
     _accountNameCtrl.text = account.accountName;
     _noteCtrl.text = account.note ?? '';
   }
 
   Future<void> _submit() async {
+    // Chống double-tap: nếu đang lưu thì bỏ qua
+    if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
 
-    // Show confirmation dialog
+    // Capture trước khi vào vùng async để tránh race condition
+    final bank = _selectedBank;
+
+    // Validation: Must select a bank
+    if (bank == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn ngân hàng từ danh sách'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show confirmation dialog — dùng local var `bank`, không dùng _selectedBank!
+    final noteText = _noteCtrl.text.trim();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -102,7 +136,7 @@ class _ClassroomBankAccountScreenState
             const Text('Vui lòng kiểm tra kỹ:',
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 8),
-            Text('Ngân hàng: ${_bankNameCtrl.text.trim()}',
+            Text('Ngân hàng: ${bank.shortName}',
                 style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text('Số tài khoản: ${_accountNoCtrl.text.trim()}',
@@ -110,6 +144,11 @@ class _ClassroomBankAccountScreenState
             const SizedBox(height: 4),
             Text('Chủ tài khoản: ${_accountNameCtrl.text.trim()}',
                 style: const TextStyle(fontWeight: FontWeight.bold)),
+            if (noteText.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text('Ghi chú: $noteText',
+                  style: const TextStyle(fontSize: 13, color: Colors.grey)),
+            ],
           ],
         ),
         actions: [
@@ -132,13 +171,14 @@ class _ClassroomBankAccountScreenState
     if (confirmed != true || !mounted) return;
 
     setState(() => _saving = true);
+    // Dùng local var `bank` — an toàn dù _selectedBank thay đổi sau await
     final result = await _service.updateBankAccount(
       classroomId: widget.classroomId,
-      bankBin: _bankBinCtrl.text.trim(),
-      bankName: _bankNameCtrl.text.trim(),
+      bankBin: bank.bankBin,
+      bankName: bank.bankName,
       accountNo: _accountNoCtrl.text.trim(),
       accountName: _accountNameCtrl.text.trim(),
-      note: _noteCtrl.text.trim(),
+      note: noteText,
     );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -159,6 +199,60 @@ class _ClassroomBankAccountScreenState
   String? _required(String? value, String message) {
     if (value == null || value.trim().isEmpty) return message;
     return null;
+  }
+
+  Widget _buildBankSelector() {
+    return InkWell(
+      onTap: _showBankPicker,
+      borderRadius: BorderRadius.circular(8),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Ngân hàng *',
+          prefixIcon: const Icon(Icons.account_balance_outlined),
+          suffixIcon: const Icon(Icons.arrow_drop_down),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        ),
+        child: _selectedBank != null
+            ? Text(_selectedBank!.shortName, style: const TextStyle(fontSize: 16))
+            : _unknownBankName != null
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_unknownBankName!, style: const TextStyle(fontSize: 16)),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Vui lòng chọn lại ngân hàng từ danh sách',
+                        style: TextStyle(fontSize: 12, color: Colors.orange),
+                      ),
+                    ],
+                  )
+                : const Text(
+                    'Chọn ngân hàng',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+      ),
+    );
+  }
+
+  Future<void> _showBankPicker() async {
+    final selected = await showModalBottomSheet<BankItem>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _BankPickerBottomSheet(
+        currentBank: _selectedBank,
+      ),
+    );
+
+    if (selected != null) {
+      setState(() {
+        _selectedBank = selected;
+        _unknownBankName = null;
+      });
+    }
   }
 
   @override
@@ -199,25 +293,7 @@ class _ClassroomBankAccountScreenState
               style: AppTextStyles.caption,
             ),
             const SizedBox(height: AppSpacing.largeSection),
-            AppInput(
-              controller: _bankNameCtrl,
-              label: 'Tên ngân hàng *',
-              hint: 'VD: MB Bank',
-              prefixIcon: const Icon(Icons.account_balance_outlined),
-              textInputAction: TextInputAction.next,
-              validator: (v) => _required(v, 'Nhập tên ngân hàng'),
-            ),
-            const SizedBox(height: AppSpacing.cardPadding),
-            AppInput(
-              controller: _bankBinCtrl,
-              label: 'Bank BIN *',
-              hint: 'VD: 970422',
-              prefixIcon: const Icon(Icons.tag_outlined),
-              keyboardType: TextInputType.number,
-              textInputAction: TextInputAction.next,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              validator: (v) => _required(v, 'Nhập Bank BIN'),
-            ),
+            _buildBankSelector(),
             const SizedBox(height: AppSpacing.cardPadding),
             AppInput(
               controller: _accountNoCtrl,
@@ -260,6 +336,139 @@ class _ClassroomBankAccountScreenState
           ],
         ),
       ),
+    );
+  }
+}
+
+
+// Bottom Sheet for Bank Selection
+class _BankPickerBottomSheet extends StatefulWidget {
+  final BankItem? currentBank;
+
+  const _BankPickerBottomSheet({this.currentBank});
+
+  @override
+  State<_BankPickerBottomSheet> createState() => _BankPickerBottomSheetState();
+}
+
+class _BankPickerBottomSheetState extends State<_BankPickerBottomSheet> {
+  final _searchCtrl = TextEditingController();
+  List<BankItem> _filteredBanks = vietnameseBanks;
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _filterBanks(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredBanks = vietnameseBanks;
+      } else {
+        final lowerQuery = query.toLowerCase();
+        _filteredBanks = vietnameseBanks.where((bank) {
+          return bank.shortName.toLowerCase().contains(lowerQuery) ||
+              bank.bankName.toLowerCase().contains(lowerQuery) ||
+              bank.bankBin.contains(query);
+        }).toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scrollController) {
+        return Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'Chọn ngân hàng',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Search bar
+                  TextField(
+                    controller: _searchCtrl,
+                    onChanged: _filterBanks,
+                    decoration: InputDecoration(
+                      hintText: 'Tìm kiếm ngân hàng...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                _filterBanks('');
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Bank list
+            Expanded(
+              child: _filteredBanks.isEmpty
+                  ? const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.search_off, size: 48, color: Colors.grey),
+                          SizedBox(height: 8),
+                          Text('Không tìm thấy ngân hàng', style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: _filteredBanks.length,
+                      itemBuilder: (context, index) {
+                        final bank = _filteredBanks[index];
+                        final isSelected = widget.currentBank?.bankBin == bank.bankBin;
+                        return ListTile(
+                          leading: const Icon(Icons.account_balance),
+                          title: Text(bank.shortName, style: const TextStyle(fontWeight: FontWeight.w500)),
+                          subtitle: Text(bank.bankName, style: const TextStyle(fontSize: 12)),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_circle, color: AppColors.primary)
+                              : null,
+                          selected: isSelected,
+                          onTap: () => Navigator.pop(context, bank),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
