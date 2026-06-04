@@ -84,7 +84,8 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
       final confirmed = data['confirmedByAdmin'] == true;
       setState(() {
         _status = status;
-        _markedPaid = marked || status == 'PENDING_VERIFICATION' || status == 'CONFIRMED';
+        _markedPaid =
+            marked || status == 'PENDING_VERIFICATION' || status == 'CONFIRMED';
         _confirmed = confirmed;
       });
       if (confirmed || status == 'CONFIRMED') {
@@ -102,11 +103,18 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Xác nhận đã chuyển khoản?'),
         content: const Text(
-            'Chỉ bấm sau khi đã chuyển khoản thành công qua app ngân hàng.\n\n'
-            'Admin sẽ đối chiếu sao kê + nội dung CK để xác nhận.'),
+          'Chỉ bấm sau khi đã chuyển khoản thành công qua app ngân hàng.\n\n'
+          'Admin sẽ đối chiếu sao kê + nội dung CK để xác nhận.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Tôi đã CK')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Huỷ'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Tôi đã CK'),
+          ),
         ],
       ),
     );
@@ -127,7 +135,10 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
       _pollStatus(); // cập nhật UI ngay
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(r['message'] ?? 'Lỗi'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(r['message'] ?? 'Lỗi'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -156,7 +167,11 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+          child: Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red),
+          ),
         ),
       );
     }
@@ -167,18 +182,29 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
     final paymentCode = _qr!['paymentCode']?.toString() ?? '';
     final collectionTitle = _qr!['collectionTitle']?.toString() ?? '';
     final deadline = _qr!['deadline']?.toString();
+    final bankName = _qr!['bankName']?.toString() ?? '';
+    final accountNo = _qr!['accountNo']?.toString() ?? '';
+    final accountName = _qr!['accountName']?.toString() ?? '';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           if (collectionTitle.isNotEmpty)
-            Text(collectionTitle,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              collectionTitle,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           const SizedBox(height: 8),
           if (amount is num)
-            Text(_fmtAmount(amount),
-                style: const TextStyle(fontSize: 24, color: Colors.blue, fontWeight: FontWeight.bold)),
+            Text(
+              _fmtAmount(amount),
+              style: const TextStyle(
+                fontSize: 24,
+                color: Colors.blue,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           if (deadline != null) ...[
             const SizedBox(height: 4),
             Text('Hạn: $deadline', style: const TextStyle(color: Colors.grey)),
@@ -203,6 +229,16 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
           else
             const Text('Không có URL QR', style: TextStyle(color: Colors.red)),
           const SizedBox(height: 16),
+          if (bankName.isNotEmpty ||
+              accountNo.isNotEmpty ||
+              accountName.isNotEmpty) ...[
+            _buildBankInfoBox(
+              bankName: bankName,
+              accountNo: accountNo,
+              accountName: accountName,
+            ),
+            const SizedBox(height: 16),
+          ],
           if (paymentCode.isNotEmpty)
             Card(
               color: Colors.amber.shade50,
@@ -211,7 +247,10 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
                 subtitle: Text(
                   paymentCode,
                   style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                  ),
                 ),
                 trailing: IconButton(
                   icon: const Icon(Icons.copy),
@@ -237,9 +276,17 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
                 icon: const Icon(Icons.check),
                 label: _markingPaid
                     ? const SizedBox(
-                        width: 20, height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Tôi đã chuyển khoản', style: TextStyle(fontSize: 16)),
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Tôi đã chuyển khoản',
+                        style: TextStyle(fontSize: 16),
+                      ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
@@ -247,6 +294,52 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBankInfoBox({
+    required String bankName,
+    required String accountNo,
+    required String accountName,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.account_balance_outlined, color: Colors.blue),
+                SizedBox(width: 8),
+                Text(
+                  'Tài khoản nhận tiền',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (bankName.isNotEmpty) Text('Ngân hàng: $bankName'),
+            if (accountNo.isNotEmpty)
+              Row(
+                children: [
+                  Expanded(child: Text('Số tài khoản: $accountNo')),
+                  IconButton(
+                    tooltip: 'Copy số tài khoản',
+                    icon: const Icon(Icons.copy, size: 20),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: accountNo));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Đã copy số tài khoản')),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            if (accountName.isNotEmpty) Text('Chủ tài khoản: $accountName'),
+          ],
+        ),
       ),
     );
   }
@@ -288,10 +381,17 @@ class _PaymentQrScreenState extends State<PaymentQrScreen> {
           Icon(icon, color: color),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(
+              text,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
           if (showSpinner)
-            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
         ],
       ),
     );

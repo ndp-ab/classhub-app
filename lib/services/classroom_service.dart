@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/config/app_config.dart';
 import '../models/class_member.dart';
+import '../models/classroom_bank_account.dart';
 
 /// Service cho phân hệ Lớp học.
 /// Sau B1 (JWT filter), backend đã yêu cầu `Authorization: Bearer <token>`
@@ -34,8 +35,12 @@ class ClassroomService {
     return 'Lỗi máy chủ (${response.statusCode})';
   }
 
-  Future<Map<String, dynamic>> createClassroom(String className, String faculty,
-      String academicYear, int userId) async {
+  Future<Map<String, dynamic>> createClassroom(
+    String className,
+    String faculty,
+    String academicYear,
+    int userId,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/classrooms/create'),
@@ -57,14 +62,15 @@ class ClassroomService {
     }
   }
 
-  Future<Map<String, dynamic>> joinClassroom(String inviteCode, int userId) async {
+  Future<Map<String, dynamic>> joinClassroom(
+    String inviteCode,
+    int userId,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/classrooms/join'),
         headers: await _headers(json: true),
-        body: json.encode({
-          'inviteCode': inviteCode,
-        }),
+        body: json.encode({'inviteCode': inviteCode}),
       );
 
       if (response.statusCode == 200) {
@@ -107,6 +113,62 @@ class ClassroomService {
         return {
           'success': true,
           'data': data.map((e) => ClassMember.fromJson(e)).toList(),
+        };
+      }
+      return {'success': false, 'message': _errorMessage(response)};
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> getBankAccount(int classroomId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/classrooms/$classroomId/bank-account'),
+        headers: await _headers(),
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'data': ClassroomBankAccount.fromJson(json.decode(response.body)),
+        };
+      }
+      return {
+        'success': false,
+        'notConfigured': response.statusCode == 400,
+        'message': _errorMessage(response),
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateBankAccount({
+    required int classroomId,
+    required String bankBin,
+    required String bankName,
+    required String accountNo,
+    required String accountName,
+    String? note,
+  }) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/classrooms/$classroomId/bank-account'),
+        headers: await _headers(json: true),
+        body: json.encode({
+          'bankBin': bankBin,
+          'bankName': bankName,
+          'accountNo': accountNo,
+          'accountName': accountName,
+          if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'data': ClassroomBankAccount.fromJson(json.decode(response.body)),
         };
       }
       return {'success': false, 'message': _errorMessage(response)};

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../models/classroom_bank_account.dart';
 import '../../models/fund_collection.dart';
 import '../../models/payment.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/classroom_service.dart';
 import '../../services/fund_service.dart';
+import '../classroom_bank_account_screen.dart';
 import 'collection_payments_screen.dart';
 import 'create_collection_screen.dart';
 import 'payment_qr_screen.dart';
@@ -20,8 +23,11 @@ class FundTab extends StatefulWidget {
 
 class _FundTabState extends State<FundTab> {
   final _service = FundService();
+  final _classroomService = ClassroomService();
   bool _loading = true;
   String? _error;
+  String? _bankAccountError;
+  ClassroomBankAccount? _bankAccount;
   List<FundCollection> _collections = [];
   List<Payment> _myPayments = [];
 
@@ -47,6 +53,7 @@ class _FundTabState extends State<FundTab> {
 
     final col = await _service.getCollections(widget.classroomId, userId);
     final my = await _service.getMyPayments(widget.classroomId, userId);
+    final bank = await _classroomService.getBankAccount(widget.classroomId);
 
     if (!mounted) return;
     setState(() {
@@ -58,6 +65,16 @@ class _FundTabState extends State<FundTab> {
       }
       if (my['success']) {
         _myPayments = (my['data'] as List).cast<Payment>();
+      }
+      if (bank['success']) {
+        _bankAccount = bank['data'] as ClassroomBankAccount;
+        _bankAccountError = null;
+      } else if (bank['notConfigured'] == true) {
+        _bankAccount = null;
+        _bankAccountError = null;
+      } else {
+        _bankAccount = null;
+        _bankAccountError = bank['message']?.toString();
       }
     });
   }
@@ -87,7 +104,11 @@ class _FundTabState extends State<FundTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+              Text(
+                _error!,
+                style: const TextStyle(color: Colors.red),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 12),
               ElevatedButton(onPressed: _load, child: const Text('Thử lại')),
             ],
@@ -102,19 +123,29 @@ class _FundTabState extends State<FundTab> {
         child: ListView(
           padding: const EdgeInsets.all(12),
           children: [
+            _buildBankAccountCard(),
+            const SizedBox(height: 8),
             if (!widget.isAdmin) _buildMySection(),
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               child: Text(
                 widget.isAdmin ? 'Danh sách đợt thu' : 'Tất cả đợt thu',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             if (_collections.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(child: Text('Chưa có khoản thu nào', style: TextStyle(color: Colors.grey))),
+                child: Center(
+                  child: Text(
+                    'Chưa có khoản thu nào',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
               )
             else
               ..._collections.map(_buildCollectionCard),
@@ -128,7 +159,8 @@ class _FundTabState extends State<FundTab> {
                 final ok = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => CreateCollectionScreen(classroomId: widget.classroomId),
+                    builder: (_) =>
+                        CreateCollectionScreen(classroomId: widget.classroomId),
                   ),
                 );
                 if (ok == true) _load();
@@ -137,6 +169,72 @@ class _FundTabState extends State<FundTab> {
               label: const Text('Tạo đợt thu'),
             )
           : null,
+    );
+  }
+
+  Future<void> _openBankAccountScreen() async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            ClassroomBankAccountScreen(classroomId: widget.classroomId),
+      ),
+    );
+    if (updated == true) _load();
+  }
+
+  Widget _buildBankAccountCard() {
+    final account = _bankAccount;
+    final hasAccount = account != null;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.account_balance_outlined, color: Colors.blue),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Tài khoản nhận tiền',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (widget.isAdmin)
+                  TextButton.icon(
+                    onPressed: _openBankAccountScreen,
+                    icon: Icon(hasAccount ? Icons.edit_outlined : Icons.add),
+                    label: Text(hasAccount ? 'Cập nhật' : 'Thiết lập'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_bankAccountError != null)
+              Text(
+                _bankAccountError!,
+                style: const TextStyle(color: Colors.red),
+              )
+            else if (account == null)
+              const Text(
+                'Chưa cấu hình tài khoản nhận tiền',
+                style: TextStyle(color: Colors.grey),
+              )
+            else ...[
+              Text(
+                account.bankName,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text('Số tài khoản: ${account.accountNo}'),
+              Text('Chủ tài khoản: ${account.accountName}'),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -160,66 +258,90 @@ class _FundTabState extends State<FundTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Khoản của bạn',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              'Khoản của bạn',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             if (_myPayments.isEmpty)
-              const Text('Bạn chưa có khoản nào', style: TextStyle(color: Colors.grey))
+              const Text(
+                'Bạn chưa có khoản nào',
+                style: TextStyle(color: Colors.grey),
+              )
             else ...[
-              Text('Chưa CK: ${unpaid.length}  •  Đã báo: ${pending.length}  •  Đã xác nhận: ${confirmed.length}'),
+              Text(
+                'Chưa CK: ${unpaid.length}  •  Đã báo: ${pending.length}  •  Đã xác nhận: ${confirmed.length}',
+              ),
               const SizedBox(height: 8),
 
               // Chưa CK — màu cam, có nút "Xem QR"
-              ...unpaid.map((p) => ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.error_outline, color: Colors.orange),
-                    title: Text(p.collectionTitle ?? 'Khoản #${p.id}'),
-                    subtitle: Text(subtitle(p)),
-                    trailing: TextButton.icon(
-                      icon: const Icon(Icons.qr_code),
-                      label: const Text('Xem QR'),
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => PaymentQrScreen(paymentId: p.id)),
-                        );
-                        _load();
-                      },
-                    ),
-                  )),
+              ...unpaid.map(
+                (p) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(
+                    Icons.error_outline,
+                    color: Colors.orange,
+                  ),
+                  title: Text(p.collectionTitle ?? 'Khoản #${p.id}'),
+                  subtitle: Text(subtitle(p)),
+                  trailing: TextButton.icon(
+                    icon: const Icon(Icons.qr_code),
+                    label: const Text('Xem QR'),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PaymentQrScreen(paymentId: p.id),
+                        ),
+                      );
+                      _load();
+                    },
+                  ),
+                ),
+              ),
 
               // Đã báo CK — màu xanh dương, chờ admin (vẫn xem được QR nếu muốn)
-              ...pending.map((p) => ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.hourglass_top, color: Colors.blue),
-                    title: Text(p.collectionTitle ?? 'Khoản #${p.id}'),
-                    subtitle: Text('${subtitle(p)}\nĐã báo CK — chờ Admin xác nhận'),
-                    isThreeLine: true,
-                    trailing: TextButton.icon(
-                      icon: const Icon(Icons.qr_code),
-                      label: const Text('Xem QR'),
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => PaymentQrScreen(paymentId: p.id)),
-                        );
-                        _load();
-                      },
-                    ),
-                  )),
+              ...pending.map(
+                (p) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.hourglass_top, color: Colors.blue),
+                  title: Text(p.collectionTitle ?? 'Khoản #${p.id}'),
+                  subtitle: Text(
+                    '${subtitle(p)}\nĐã báo CK — chờ Admin xác nhận',
+                  ),
+                  isThreeLine: true,
+                  trailing: TextButton.icon(
+                    icon: const Icon(Icons.qr_code),
+                    label: const Text('Xem QR'),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PaymentQrScreen(paymentId: p.id),
+                        ),
+                      );
+                      _load();
+                    },
+                  ),
+                ),
+              ),
 
               // Đã xác nhận — màu xanh lá
-              ...confirmed.map((p) => ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.check_circle, color: Colors.green),
-                    title: Text(p.collectionTitle ?? 'Khoản #${p.id}'),
-                    subtitle: Text(p.confirmedByName != null
+              ...confirmed.map(
+                (p) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.check_circle, color: Colors.green),
+                  title: Text(p.collectionTitle ?? 'Khoản #${p.id}'),
+                  subtitle: Text(
+                    p.confirmedByName != null
                         ? 'Đã xác nhận bởi ${p.confirmedByName}'
-                        : 'Đã xác nhận'),
-                  )),
+                        : 'Đã xác nhận',
+                  ),
+                ),
+              ),
             ],
           ],
         ),
@@ -230,7 +352,10 @@ class _FundTabState extends State<FundTab> {
   Widget _buildCollectionCard(FundCollection c) {
     return Card(
       child: ListTile(
-        title: Text(c.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          c.title,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
