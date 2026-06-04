@@ -24,7 +24,7 @@ class ClassroomService {
 
   String _errorMessage(http.Response response) {
     if (response.statusCode == 401 || response.statusCode == 403) {
-      return 'Bạn không có quyền xem danh sách thành viên (${response.statusCode})';
+      return 'Bạn không có quyền thực hiện thao tác này (${response.statusCode})';
     }
     try {
       final body = json.decode(response.body);
@@ -33,6 +33,19 @@ class ClassroomService {
       }
     } catch (_) {}
     return 'Lỗi máy chủ (${response.statusCode})';
+  }
+
+  /// Trả true nếu response là trạng thái "chưa cấu hình tài khoản".
+  /// Chỉ nhận HTTP 400 VÀ body message chứa "chưa cấu hình".
+  bool _isNotConfigured(http.Response response) {
+    if (response.statusCode != 400) return false;
+    try {
+      final body = json.decode(response.body);
+      if (body is Map && body['message'] != null) {
+        return body['message'].toString().contains('chưa cấu hình');
+      }
+    } catch (_) {}
+    return false;
   }
 
   Future<Map<String, dynamic>> createClassroom(
@@ -136,7 +149,7 @@ class ClassroomService {
       }
       return {
         'success': false,
-        'notConfigured': response.statusCode == 400,
+        'notConfigured': _isNotConfigured(response),
         'message': _errorMessage(response),
       };
     } catch (e) {
