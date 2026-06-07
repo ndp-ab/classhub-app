@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../models/event.dart';
 import '../../providers/auth_provider.dart';
@@ -22,6 +25,7 @@ class _EventsTabState extends State<EventsTab> {
   String? _error;
   List<ClassEvent> _events = [];
   Set<int> _myEventIds = {};
+  Map<int, EventParticipant> _myParticipants = {};
 
   @override
   void initState() {
@@ -56,11 +60,13 @@ class _EventsTabState extends State<EventsTab> {
       }
       if (my['success']) {
         final list = (my['data'] as List).cast<EventParticipant>();
-        // Chỉ lấy những bản ghi có eventId hợp lệ (không null)
-        _myEventIds = list
-            .where((p) => p.eventId != null)
-            .map((p) => p.eventId as int)
-            .toSet();
+        final participants = <int, EventParticipant>{};
+        for (final p in list) {
+          final eventId = p.eventId;
+          if (eventId != null) participants[eventId] = p;
+        }
+        _myParticipants = participants;
+        _myEventIds = participants.keys.toSet();
       }
     });
   }
@@ -88,6 +94,159 @@ class _EventsTabState extends State<EventsTab> {
         SnackBar(content: Text(r['message'] ?? 'Lỗi'), backgroundColor: Colors.red),
       );
     }
+  }
+
+  Future<void> _captureCheckinImage(int eventId) async {
+    while (mounted) {
+      final image = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+        maxWidth: 1280,
+      );
+      if (image == null || !mounted) return;
+
+      final action = await _showCheckinPreview(eventId, image.path);
+      if (action == _CheckinPreviewAction.retake) continue;
+      return;
+    }
+  }
+
+  Future<_CheckinPreviewAction?> _showCheckinPreview(
+    int eventId,
+    String imagePath,
+  ) {
+    bool submitting = false;
+
+    return showDialog<_CheckinPreviewAction>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('Gửi ảnh minh chứng'),
+              content: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  File(imagePath),
+                  fit: BoxFit.cover,
+                  width: double.maxFinite,
+                  height: 320,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: submitting
+                      ? null
+                      : () => Navigator.pop(
+                          dialogContext,
+                          _CheckinPreviewAction.retake,
+                        ),
+                  child: const Text('Chụp lại'),
+                ),
+                ElevatedButton.icon(
+                  icon: submitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cloud_upload_outlined),
+                  label: const Text('Gửi minh chứng'),
+                  onPressed: submitting
+                      ? null
+                      : () async {
+                          setDialogState(() => submitting = true);
+                          final navigator = Navigator.of(dialogContext);
+                          final messenger = ScaffoldMessenger.of(context);
+                          final r = await _service.submitCheckinImage(
+                            eventId: eventId,
+                            imagePath: imagePath,
+                          );
+                          // Guard: parent widget phải còn mounted
+                          if (!mounted) return;
+                          // Guard: dialog context phải còn mounted trước khi gọi setDialogState/navigator
+                          if (!dialogContext.mounted) return;
+                          if (r['success']) {
+                            navigator.pop(_CheckinPreviewAction.submitted);
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Đã gửi ảnh minh chứng, vui lòng chờ Ban cán sự xác nhận',
+                                ),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            _load();
+                          } else {
+                            setDialogState(() => submitting = false);
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(r['message'] ?? 'Lỗi'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCheckinControl(int eventId, EventParticipant? participant) {
+    if (participant == null) return const SizedBox.shrink();
+
+    final status = participant.checkinSubmissionStatus;
+    if (participant.checkedIn || status == 'APPROVED') {
+      return const Align(
+        alignment: Alignment.centerLeft,
+        child: Chip(
+          avatar: Icon(Icons.verified_outlined, size: 16, color: Colors.green),
+          label: Text('Đã điểm danh', style: TextStyle(fontSize: 12)),
+          backgroundColor: Color(0xFFE8F5E9),
+        ),
+      );
+    }
+
+    if (status == 'PENDING') {
+      return const Align(
+        alignment: Alignment.centerLeft,
+        child: Chip(
+          avatar: Icon(Icons.hourglass_top, size: 16, color: Colors.orange),
+          label: Text(
+            'Chờ ban cán sự xác nhận',
+            style: TextStyle(fontSize: 12),
+          ),
+          backgroundColor: Color(0xFFFFF8E1),
+        ),
+      );
+    }
+
+    final rejected = status == 'REJECTED';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (rejected)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              'Ảnh bị từ chối, vui lòng gửi lại',
+              style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+            ),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.photo_camera_outlined),
+            label: Text(rejected ? 'Gửi lại ảnh' : 'Chụp ảnh điểm danh'),
+            onPressed: () => _captureCheckinImage(eventId),
+          ),
+        ),
+      ],
+    );
   }
 
   String _fmtDateTime(DateTime? d) {
@@ -130,6 +289,7 @@ class _EventsTabState extends State<EventsTab> {
                           itemCount: _events.length,
                           itemBuilder: (_, i) {
                             final e = _events[i];
+                            final myParticipant = _myParticipants[e.id];
                             final joined = _myEventIds.contains(e.id);
                             final title = e.title.trim().isNotEmpty
                                 ? e.title.trim()
@@ -203,6 +363,10 @@ class _EventsTabState extends State<EventsTab> {
                                       ],
                                     ),
                                     const SizedBox(height: 8),
+                                    if (joined && !widget.isAdmin) ...[
+                                      _buildCheckinControl(e.id, myParticipant),
+                                      const SizedBox(height: 8),
+                                    ],
                                     Align(
                                       alignment: Alignment.centerRight,
                                       child: widget.isAdmin
@@ -264,3 +428,5 @@ class _EventsTabState extends State<EventsTab> {
     );
   }
 }
+
+enum _CheckinPreviewAction { retake, submitted }

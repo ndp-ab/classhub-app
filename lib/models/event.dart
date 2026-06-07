@@ -46,6 +46,10 @@ class EventParticipant {
   final DateTime? checkedInAt;
   final String? checkedByName;   // B4: ai check-in
   final DateTime? registeredAt;
+  final int? checkinSubmissionId;
+  final String? checkinSubmissionStatus;
+  final String? checkinImageUrl;
+  final DateTime? checkinSubmittedAt;
 
   EventParticipant({
     required this.id,
@@ -57,6 +61,10 @@ class EventParticipant {
     this.checkedInAt,
     this.checkedByName,
     this.registeredAt,
+    this.checkinSubmissionId,
+    this.checkinSubmissionStatus,
+    this.checkinImageUrl,
+    this.checkinSubmittedAt,
   });
 
   factory EventParticipant.fromJson(Map<String, dynamic> json) {
@@ -70,6 +78,12 @@ class EventParticipant {
       checkedInAt: json['checkedInAt'] != null ? DateTime.tryParse(json['checkedInAt']) : null,
       checkedByName: json['checkedByName'],
       registeredAt: json['registeredAt'] != null ? DateTime.tryParse(json['registeredAt']) : null,
+      checkinSubmissionId: (json['checkinSubmissionId'] as num?)?.toInt(),
+      checkinSubmissionStatus: json['checkinSubmissionStatus'],
+      checkinImageUrl: json['checkinImageUrl'],
+      checkinSubmittedAt: json['checkinSubmittedAt'] != null
+          ? DateTime.tryParse(json['checkinSubmittedAt'])
+          : null,
     );
   }
 }
