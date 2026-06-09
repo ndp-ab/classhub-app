@@ -13,10 +13,12 @@ import '../core/widgets/app_loading.dart';
 import '../core/widgets/app_section_title.dart';
 import '../providers/auth_provider.dart';
 import '../services/classroom_service.dart';
+import '../services/notification_service.dart';
 import 'login_screen.dart';
 import 'create_classroom_screen.dart';
 import 'join_classroom_screen.dart';
 import 'classroom_detail_screen.dart';
+import 'notification_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,14 +29,17 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _classroomService = ClassroomService();
+  final _notificationService = NotificationService();
   List<dynamic> _classrooms = [];
   bool _isLoading = true;
   String? _errorMessage;
+  int _unreadCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadClassrooms();
+    _loadUnreadCount();
   }
 
   Future<void> _loadClassrooms() async {
@@ -70,11 +75,32 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadUnreadCount() async {
+    try {
+      final count = await _notificationService.getUnreadCount();
+      if (!mounted) return;
+      setState(() => _unreadCount = count);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _unreadCount = 0);
+    }
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const NotificationScreen()),
+    );
+    if (!mounted) return;
+    _loadUnreadCount();
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
-    final String fullName =
-        auth.fullName?.trim().isNotEmpty == true ? auth.fullName!.trim() : 'bạn';
+    final String fullName = auth.fullName?.trim().isNotEmpty == true
+        ? auth.fullName!.trim()
+        : 'bạn';
 
     return Scaffold(
       backgroundColor: AppColors.surfaceMuted,
@@ -103,7 +129,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     _HeaderIconButton(
                       icon: Icons.notifications_none_outlined,
                       tooltip: 'Thông báo',
-                      onPressed: () {},
+                      badgeCount: _unreadCount,
+                      onPressed: _openNotifications,
                     ),
                     const SizedBox(width: AppSpacing.small),
                     _HeaderIconButton(
@@ -114,7 +141,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (!context.mounted) return;
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
+                          ),
                           (route) => false,
                         );
                       },
@@ -221,11 +250,13 @@ class _HeaderIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -245,7 +276,38 @@ class _HeaderIconButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadius.button),
             ),
             alignment: Alignment.center,
-            child: Icon(icon, color: AppColors.textPrimary, size: 22),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                Icon(icon, color: AppColors.textPrimary, size: 22),
+                if (badgeCount > 0)
+                  Positioned(
+                    right: -8,
+                    top: -8,
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: const BoxDecoration(
+                        color: AppColors.danger,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        badgeCount > 99 ? '99+' : badgeCount.toString(),
+                        style: AppTextStyles.small.copyWith(
+                          color: AppColors.onPrimary,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -263,9 +325,10 @@ class _ClassroomTile extends StatelessWidget {
     final bool isAdmin = UserRoles.isAdminLike(classroom['role'] as String?);
     final String faculty = (classroom['faculty'] as String?) ?? '';
     final String year = (classroom['academicYear'] as String?) ?? '';
-    final String subtitleText = <String>[faculty, year]
-        .where((String s) => s.isNotEmpty)
-        .join(' • ');
+    final String subtitleText = <String>[
+      faculty,
+      year,
+    ].where((String s) => s.isNotEmpty).join(' • ');
     final String inviteCode = (classroom['inviteCode'] as String?) ?? '';
 
     return AppCard(
@@ -376,8 +439,9 @@ class _RoleChip extends StatelessWidget {
     final Color background = isAdmin
         ? AppColors.primary.withValues(alpha: 0.1)
         : AppColors.surfaceMuted;
-    final Color foreground =
-        isAdmin ? AppColors.primary : AppColors.textSecondary;
+    final Color foreground = isAdmin
+        ? AppColors.primary
+        : AppColors.textSecondary;
 
     return Container(
       padding: const EdgeInsets.symmetric(
