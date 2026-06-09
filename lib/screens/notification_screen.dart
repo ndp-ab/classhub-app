@@ -12,7 +12,10 @@ import '../models/app_notification.dart';
 import '../services/notification_service.dart';
 
 class NotificationScreen extends StatefulWidget {
-  const NotificationScreen({super.key});
+  const NotificationScreen({super.key, this.classroomId, this.classroomName});
+
+  final int? classroomId;
+  final String? classroomName;
 
   @override
   State<NotificationScreen> createState() => _NotificationScreenState();
@@ -34,7 +37,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   Future<void> _loadNotifications() async {
     try {
-      final notifications = await _service.getNotifications();
+      final notifications = await _service.getNotifications(
+        classroomId: widget.classroomId,
+      );
       if (!mounted) return;
       setState(() {
         _notifications = notifications;
@@ -84,7 +89,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
     setState(() => _isMarkingAll = true);
     try {
-      await _service.markAllAsRead();
+      await _service.markAllAsRead(classroomId: widget.classroomId);
       if (!mounted) return;
       final now = DateTime.now();
       setState(() {
@@ -114,6 +119,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
   @override
   Widget build(BuildContext context) {
     final hasUnread = _notifications.any((item) => !item.isRead);
+    final classroomName = widget.classroomName?.trim();
+    final title = widget.classroomId == null
+        ? 'Thông báo'
+        : classroomName != null && classroomName.isNotEmpty
+        ? 'Thông báo $classroomName'
+        : 'Thông báo lớp';
 
     return Scaffold(
       backgroundColor: AppColors.surfaceMuted,
@@ -152,7 +163,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 ],
               ),
               const SizedBox(height: AppSpacing.largeSection),
-              Text('Thông báo', style: AppTextStyles.headingLarge),
+              Text(title, style: AppTextStyles.headingLarge),
               const SizedBox(height: AppSpacing.sectionPadding),
               Expanded(child: _buildBody()),
             ],

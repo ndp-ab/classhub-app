@@ -22,13 +22,16 @@ class NotificationService {
   Future<List<AppNotification>> getNotifications({
     int page = 0,
     int size = 20,
+    int? classroomId,
   }) async {
-    final uri = Uri.parse('$baseUrl/notifications').replace(
-      queryParameters: <String, String>{
-        'page': page.toString(),
-        'size': size.toString(),
-      },
-    );
+    final queryParameters = <String, String>{
+      'page': page.toString(),
+      'size': size.toString(),
+      if (classroomId != null) 'classroomId': classroomId.toString(),
+    };
+    final uri = Uri.parse(
+      '$baseUrl/notifications',
+    ).replace(queryParameters: queryParameters);
 
     try {
       final response = await http.get(uri, headers: await _headers());
@@ -51,12 +54,15 @@ class NotificationService {
     }
   }
 
-  Future<int> getUnreadCount() async {
+  Future<int> getUnreadCount({int? classroomId}) async {
+    final uri = Uri.parse('$baseUrl/notifications/unread-count').replace(
+      queryParameters: classroomId == null
+          ? null
+          : <String, String>{'classroomId': classroomId.toString()},
+    );
+
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/notifications/unread-count'),
-        headers: await _headers(),
-      );
+      final response = await http.get(uri, headers: await _headers());
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         final count = _parseCount(decoded);
@@ -87,12 +93,15 @@ class NotificationService {
     }
   }
 
-  Future<void> markAllAsRead() async {
+  Future<void> markAllAsRead({int? classroomId}) async {
+    final uri = Uri.parse('$baseUrl/notifications/read-all').replace(
+      queryParameters: classroomId == null
+          ? null
+          : <String, String>{'classroomId': classroomId.toString()},
+    );
+
     try {
-      final response = await http.put(
-        Uri.parse('$baseUrl/notifications/read-all'),
-        headers: await _headers(),
-      );
+      final response = await http.put(uri, headers: await _headers());
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception(_errorMessage(response));
       }

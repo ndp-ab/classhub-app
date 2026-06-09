@@ -14,12 +14,14 @@ import '../core/widgets/app_section_title.dart';
 import '../core/utils/formatters.dart';
 import '../models/class_member.dart';
 import '../services/classroom_service.dart';
+import '../services/notification_service.dart';
 import 'classroom_switcher_sheet.dart';
 import 'events/create_event_screen.dart';
 import 'events/events_tab.dart';
 import 'fund/create_collection_screen.dart';
 import 'fund/expenses_screen.dart';
 import 'fund/fund_tab.dart';
+import 'notification_screen.dart';
 
 class ClassroomDetailScreen extends StatefulWidget {
   final int classroomId;
@@ -44,20 +46,50 @@ class ClassroomDetailScreen extends StatefulWidget {
 }
 
 class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> {
+  final _notificationService = NotificationService();
+
   int _selectedIndex = 0;
   int _fundModuleVersion = 0;
   int _eventModuleVersion = 0;
+  int _classroomUnreadCount = 0;
 
   bool get _isAdmin => UserRoles.isAdminLike(widget.role);
 
-  void _showComingSoon(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  @override
+  void initState() {
+    super.initState();
+    _loadClassroomUnreadCount();
+  }
+
+  Future<void> _loadClassroomUnreadCount() async {
+    try {
+      final count = await _notificationService.getUnreadCount(
+        classroomId: widget.classroomId,
+      );
+      if (!mounted) return;
+      setState(() => _classroomUnreadCount = count);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _classroomUnreadCount = 0);
+    }
   }
 
   void _selectTab(int index) {
     setState(() => _selectedIndex = index);
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NotificationScreen(
+          classroomId: widget.classroomId,
+          classroomName: widget.classroomName,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _loadClassroomUnreadCount();
   }
 
   Future<void> _openClassroomSwitcher() async {
@@ -70,9 +102,8 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> {
           top: Radius.circular(AppRadius.bottomSheet),
         ),
       ),
-      builder: (_) => ClassroomSwitcherSheet(
-        currentClassroomId: widget.classroomId,
-      ),
+      builder: (_) =>
+          ClassroomSwitcherSheet(currentClassroomId: widget.classroomId),
     );
 
     if (!mounted || selectedClassroom == null) return;
@@ -142,9 +173,9 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> {
                 children: [
                   _DashboardHeader(
                     classroomName: widget.classroomName,
+                    unreadCount: _classroomUnreadCount,
                     onSwitchClassroom: _openClassroomSwitcher,
-                    onNotifications: () =>
-                        _showComingSoon('Thông báo sẽ được bổ sung sau'),
+                    onNotifications: _openNotifications,
                   ),
                 ],
               ),
@@ -218,11 +249,13 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> {
 class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader({
     required this.classroomName,
+    required this.unreadCount,
     required this.onSwitchClassroom,
     required this.onNotifications,
   });
 
   final String classroomName;
+  final int unreadCount;
   final VoidCallback onSwitchClassroom;
   final VoidCallback onNotifications;
 
@@ -274,6 +307,7 @@ class _DashboardHeader extends StatelessWidget {
         _HeaderIconButton(
           icon: Icons.notifications_none_outlined,
           tooltip: 'Thông báo',
+          badgeCount: unreadCount,
           onPressed: onNotifications,
         ),
       ],
@@ -286,11 +320,13 @@ class _HeaderIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -310,7 +346,38 @@ class _HeaderIconButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadius.button),
             ),
             alignment: Alignment.center,
-            child: Icon(icon, color: AppColors.textPrimary, size: 22),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                Icon(icon, color: AppColors.textPrimary, size: 22),
+                if (badgeCount > 0)
+                  Positioned(
+                    right: -8,
+                    top: -8,
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: const BoxDecoration(
+                        color: AppColors.danger,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        badgeCount > 99 ? '99+' : badgeCount.toString(),
+                        style: AppTextStyles.small.copyWith(
+                          color: AppColors.onPrimary,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
