@@ -1,6 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/app_empty_state.dart';
+import '../../core/widgets/app_error_state.dart';
+import '../../core/widgets/app_loading.dart';
+import '../../core/widgets/app_section_title.dart';
+import '../../core/widgets/payment_status_badge.dart';
 import '../../models/classroom_bank_account.dart';
+import '../../models/expense.dart';
 import '../../models/fund_collection.dart';
 import '../../models/payment.dart';
 import '../../providers/auth_provider.dart';
@@ -30,6 +43,8 @@ class _FundTabState extends State<FundTab> {
   ClassroomBankAccount? _bankAccount;
   List<FundCollection> _collections = [];
   List<Payment> _myPayments = [];
+  List<Expense> _expenses = [];
+  bool _expensesLoaded = false;
 
   @override
   void initState() {
@@ -41,6 +56,7 @@ class _FundTabState extends State<FundTab> {
     setState(() {
       _loading = true;
       _error = null;
+      _expensesLoaded = false;
     });
     final userId = context.read<AuthProvider>().userId;
     if (userId == null) {
@@ -54,6 +70,10 @@ class _FundTabState extends State<FundTab> {
     final col = await _service.getCollections(widget.classroomId, userId);
     final my = await _service.getMyPayments(widget.classroomId, userId);
     final bank = await _classroomService.getBankAccount(widget.classroomId);
+    final expenseResult = await _service.getExpenses(
+      widget.classroomId,
+      userId,
+    );
 
     if (!mounted) return;
     setState(() {
@@ -65,6 +85,13 @@ class _FundTabState extends State<FundTab> {
       }
       if (my['success']) {
         _myPayments = (my['data'] as List).cast<Payment>();
+      }
+      if (expenseResult['success']) {
+        _expenses = (expenseResult['data'] as List).cast<Expense>();
+        _expensesLoaded = true;
+      } else {
+        _expenses = [];
+        _expensesLoaded = false;
       }
       if (bank['success']) {
         _bankAccount = bank['data'] as ClassroomBankAccount;
@@ -94,81 +121,40 @@ class _FundTabState extends State<FundTab> {
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
+  String _displayText(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? 'Chưa có dữ liệu' : trimmed;
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    return Scaffold(backgroundColor: AppColors.background, body: _buildBody());
+  }
+
+  Widget _buildBody() {
+    if (_loading) return const AppLoading(message: 'Đang tải quỹ lớp');
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _error!,
-                style: const TextStyle(color: Colors.red),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton(onPressed: _load, child: const Text('Thử lại')),
-            ],
-          ),
-        ),
-      );
+      return AppErrorState(message: _error, onRetry: _load);
     }
 
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
-            _buildBankAccountCard(),
-            const SizedBox(height: 8),
-            if (!widget.isAdmin) _buildMySection(),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-              child: Text(
-                widget.isAdmin ? 'Danh sách đợt thu' : 'Tất cả đợt thu',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            if (_collections.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(
-                  child: Text(
-                    'Chưa có khoản thu nào',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ),
-              )
-            else
-              ..._collections.map(_buildCollectionCard),
-          ],
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.screenHorizontal,
+          AppSpacing.cardPadding,
+          AppSpacing.screenHorizontal,
+          AppSpacing.largeSection,
         ),
+        children: [
+          _buildOverviewCard(),
+          const SizedBox(height: AppSpacing.cardPadding),
+          _buildBankAccountCard(),
+          const SizedBox(height: AppSpacing.largeSection),
+          if (widget.isAdmin) _buildCollectionsSection() else _buildMySection(),
+        ],
       ),
-      floatingActionButton: widget.isAdmin
-          ? FloatingActionButton.extended(
-              heroTag: 'fund_create_collection_fab',
-              onPressed: () async {
-                final ok = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        CreateCollectionScreen(classroomId: widget.classroomId),
-                  ),
-                );
-                if (ok == true) _load();
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Tạo đợt thu'),
-            )
-          : null,
     );
   }
 
@@ -180,206 +166,523 @@ class _FundTabState extends State<FundTab> {
             ClassroomBankAccountScreen(classroomId: widget.classroomId),
       ),
     );
-    if (updated == true) _load();
+    if (updated == true && mounted) _load();
+  }
+
+  Future<void> _openCreateCollectionScreen() async {
+    final ok = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateCollectionScreen(classroomId: widget.classroomId),
+      ),
+    );
+    if (ok == true && mounted) _load();
+  }
+
+  Future<void> _openCollectionPayments(FundCollection collection) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CollectionPaymentsScreen(
+          collectionId: collection.id,
+          collectionTitle: collection.title,
+          isAdmin: widget.isAdmin,
+        ),
+      ),
+    );
+    if (mounted) _load();
+  }
+
+  Future<void> _openPaymentQr(Payment payment) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => PaymentQrScreen(paymentId: payment.id)),
+    );
+    if (mounted) _load();
+  }
+
+  Widget _buildOverviewCard() {
+    final totalCollected = _totalCollected();
+    final totalExpense = _expensesLoaded
+        ? _expenses.fold<double>(0, (total, expense) => total + expense.amount)
+        : null;
+    final balance = totalCollected != null && totalExpense != null
+        ? totalCollected - totalExpense
+        : null;
+
+    return AppCard(
+      backgroundColor: AppColors.primary,
+      borderColor: AppColors.primary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.account_balance_wallet_outlined,
+                size: 18,
+                color: AppColors.onPrimary.withValues(alpha: 0.72),
+              ),
+              const SizedBox(width: AppSpacing.small),
+              Expanded(
+                child: Text(
+                  'Số dư quỹ lớp',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.onPrimary.withValues(alpha: 0.72),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.small),
+          Text(
+            balance == null ? 'Chưa có dữ liệu' : _fmtAmount(balance),
+            style: AppTextStyles.heading.copyWith(
+              color: AppColors.onPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: AppSpacing.cardPadding),
+          Row(
+            children: [
+              Expanded(
+                child: _BalanceSummaryItem(
+                  label: 'Đã thu',
+                  value: totalCollected == null
+                      ? 'Chưa có dữ liệu'
+                      : _fmtAmount(totalCollected),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.small),
+              Expanded(
+                child: _BalanceSummaryItem(
+                  label: 'Đã chi',
+                  value: totalExpense == null
+                      ? 'Chưa có dữ liệu'
+                      : _fmtAmount(totalExpense),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  double? _totalCollected() {
+    if (widget.isAdmin) {
+      return _collections.fold<double>(
+        0,
+        (total, collection) => total + collection.amount * collection.paidCount,
+      );
+    }
+
+    final confirmedPayments = _myPayments.where(
+      (payment) => payment.isConfirmed,
+    );
+    if (confirmedPayments.any((payment) => payment.amount == null)) {
+      return null;
+    }
+
+    return confirmedPayments.fold<double>(
+      0,
+      (total, payment) => total + payment.amount!,
+    );
   }
 
   Widget _buildBankAccountCard() {
     final account = _bankAccount;
     final hasAccount = account != null;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.account_balance_outlined, color: Colors.blue),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Tài khoản nhận tiền',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.element),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  'Tài khoản nhận tiền',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (widget.isAdmin)
-                  TextButton.icon(
-                    onPressed: _openBankAccountScreen,
-                    icon: Icon(hasAccount ? Icons.edit_outlined : Icons.add),
-                    label: Text(hasAccount ? 'Cập nhật' : 'Thiết lập'),
+              ),
+              if (widget.isAdmin) ...[
+                const SizedBox(width: AppSpacing.small),
+                AppButton(
+                  label: hasAccount ? 'Cập nhật' : 'Thiết lập',
+                  size: AppButtonSize.small,
+                  variant: AppButtonVariant.ghost,
+                  fullWidth: false,
+                  onPressed: _openBankAccountScreen,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.tiny),
+          if (_bankAccountError != null)
+            Text(
+              _bankAccountError!,
+              style: AppTextStyles.small.copyWith(color: AppColors.danger),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            )
+          else if (account == null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.isAdmin
+                      ? 'Chưa có tài khoản nhận tiền'
+                      : 'Lớp chưa có tài khoản nhận tiền.',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textPrimary,
                   ),
+                ),
+                if (widget.isAdmin) ...[
+                  const SizedBox(height: AppSpacing.tiny),
+                  Text(
+                    'Thiết lập để sinh viên chuyển khoản.',
+                    style: AppTextStyles.small,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${_displayText(account.displayBankName)} · ${_displayText(account.accountNo)}',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppSpacing.tiny),
+                Text(
+                  _displayText(account.accountName),
+                  style: AppTextStyles.small,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            if (_bankAccountError != null)
-              Text(
-                _bankAccountError!,
-                style: const TextStyle(color: Colors.red),
-              )
-            else if (account == null)
-              const Text(
-                'Chưa cấu hình tài khoản nhận tiền',
-                style: TextStyle(color: Colors.grey),
-              )
-            else ...[
-              Text(
-                account.bankName,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              Text('Số tài khoản: ${account.accountNo}'),
-              Text('Chủ tài khoản: ${account.accountName}'),
-            ],
-          ],
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildMySection() {
-    // GP1: 3 trạng thái
     final unpaid = _myPayments.where((p) => p.isUnpaid).toList();
     final pending = _myPayments.where((p) => p.isPending).toList();
     final confirmed = _myPayments.where((p) => p.isConfirmed).toList();
+    final orderedPayments = <Payment>[...unpaid, ...pending, ...confirmed];
 
-    String subtitle(p) {
-      if (p.amount == null) return '';
-      final money = _fmtAmount(p.amount!);
-      final hasDeadline = p.deadline != null;
-      return hasDeadline ? '$money  •  Hạn: ${_fmtDate(p.deadline)}' : money;
-    }
-
-    return Card(
-      color: Colors.blue.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Khoản của bạn',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppSectionTitle(
+          title: 'Khoản của tôi',
+          subtitle: _myPayments.isEmpty
+              ? null
+              : '${confirmed.length} đã xác nhận • ${pending.length} chờ • ${unpaid.length} chưa CK',
+          padding: EdgeInsets.zero,
+        ),
+        const SizedBox(height: AppSpacing.element),
+        if (_myPayments.isEmpty)
+          const AppEmptyState(
+            icon: Icons.account_balance_wallet_outlined,
+            title: 'Bạn chưa có khoản nào',
+            message:
+                'Các khoản cần đóng sẽ hiển thị tại đây khi lớp tạo đợt thu.',
+          )
+        else
+          ...orderedPayments.map(
+            (payment) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.element),
+              child: _buildMyPaymentCard(payment),
             ),
-            const SizedBox(height: 8),
-            if (_myPayments.isEmpty)
-              const Text(
-                'Bạn chưa có khoản nào',
-                style: TextStyle(color: Colors.grey),
-              )
-            else ...[
-              Text(
-                'Chưa CK: ${unpaid.length}  •  Đã báo: ${pending.length}  •  Đã xác nhận: ${confirmed.length}',
-              ),
-              const SizedBox(height: 8),
+          ),
+      ],
+    );
+  }
 
-              // Chưa CK — màu cam, có nút "Xem QR"
-              ...unpaid.map(
-                (p) => ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
-                    Icons.error_outline,
-                    color: Colors.orange,
+  Widget _buildMyPaymentCard(Payment payment) {
+    final canOpenQr = payment.isUnpaid || payment.isPending;
+    final title = payment.collectionTitle ?? 'Khoản #${payment.id}';
+    final amount = payment.amount == null
+        ? 'Chưa có dữ liệu'
+        : _fmtAmount(payment.amount!);
+    final deadline = payment.deadline == null
+        ? 'Chưa có hạn đóng'
+        : 'Hạn ${_fmtDate(payment.deadline)}';
+
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.element),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
-                  title: Text(p.collectionTitle ?? 'Khoản #${p.id}'),
-                  subtitle: Text(subtitle(p)),
-                  trailing: TextButton.icon(
-                    icon: const Icon(Icons.qr_code),
-                    label: const Text('Xem QR'),
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PaymentQrScreen(paymentId: p.id),
-                        ),
-                      );
-                      _load();
-                    },
-                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-
-              // Đã báo CK — màu xanh dương, chờ admin (vẫn xem được QR nếu muốn)
-              ...pending.map(
-                (p) => ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.hourglass_top, color: Colors.blue),
-                  title: Text(p.collectionTitle ?? 'Khoản #${p.id}'),
-                  subtitle: Text(
-                    '${subtitle(p)}\nĐã báo CK — chờ Admin xác nhận',
+              const SizedBox(width: AppSpacing.small),
+              Flexible(
+                flex: 2,
+                child: Text(
+                  amount,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
-                  isThreeLine: true,
-                  trailing: TextButton.icon(
-                    icon: const Icon(Icons.qr_code),
-                    label: const Text('Xem QR'),
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PaymentQrScreen(paymentId: p.id),
-                        ),
-                      );
-                      _load();
-                    },
-                  ),
-                ),
-              ),
-
-              // Đã xác nhận — màu xanh lá
-              ...confirmed.map(
-                (p) => ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.check_circle, color: Colors.green),
-                  title: Text(p.collectionTitle ?? 'Khoản #${p.id}'),
-                  subtitle: Text(
-                    p.confirmedByName != null
-                        ? 'Đã xác nhận bởi ${p.confirmedByName}'
-                        : 'Đã xác nhận',
-                  ),
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: AppSpacing.small),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: AppSpacing.small,
+                  runSpacing: AppSpacing.tiny,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      deadline,
+                      style: AppTextStyles.small,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    PaymentStatusBadge(status: payment.status, dense: true),
+                  ],
+                ),
+              ),
+              if (canOpenQr) ...[
+                const SizedBox(width: AppSpacing.small),
+                TextButton(
+                  onPressed: () => _openPaymentQr(payment),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.small,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    'Xem QR',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (payment.isConfirmed && payment.confirmedByName != null) ...[
+            const SizedBox(height: AppSpacing.tiny),
+            Text(
+              'Xác nhận bởi ${payment.confirmedByName}',
+              style: AppTextStyles.small,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildCollectionCard(FundCollection c) {
-    return Card(
-      child: ListTile(
-        title: Text(
-          c.title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+  Widget _buildCollectionsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppSectionTitle(
+          title: 'Các đợt thu',
+          subtitle: _collections.isEmpty
+              ? null
+              : '${_collections.length} đợt thu',
+          padding: EdgeInsets.zero,
+          trailing: AppButton(
+            label: 'Tạo khoản thu',
+            icon: Icons.add,
+            size: AppButtonSize.small,
+            fullWidth: false,
+            onPressed: _openCreateCollectionScreen,
+          ),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Số tiền: ${_fmtAmount(c.amount)}'),
-            if (c.deadline != null) Text('Hạn: ${_fmtDate(c.deadline)}'),
-            Text('Đã đóng: ${c.paidCount}/${c.totalMembers}'),
-          ],
-        ),
-        trailing: widget.isAdmin ? const Icon(Icons.chevron_right) : null,
-        onTap: widget.isAdmin
-            ? () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CollectionPaymentsScreen(
-                      collectionId: c.id,
-                      collectionTitle: c.title,
-                      isAdmin: widget.isAdmin,
-                    ),
+        const SizedBox(height: AppSpacing.element),
+        if (_collections.isEmpty)
+          AppEmptyState(
+            icon: Icons.receipt_long_outlined,
+            title: 'Chưa có khoản thu nào',
+            message: 'Tạo khoản thu đầu tiên để bắt đầu theo dõi đóng quỹ.',
+            actionLabel: 'Tạo khoản thu',
+            onAction: _openCreateCollectionScreen,
+          )
+        else
+          ..._collections.map(
+            (collection) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.element),
+              child: _buildCollectionCard(collection),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildCollectionCard(FundCollection collection) {
+    final hasTotalMembers = collection.totalMembers > 0;
+    final amount = '${_fmtAmount(collection.amount)}/người';
+    final deadline = collection.deadline == null
+        ? 'Chưa có hạn đóng'
+        : 'Hạn ${_fmtDate(collection.deadline)}';
+    final paidSummary = hasTotalMembers
+        ? 'Đã đóng ${collection.paidCount}/${collection.totalMembers}'
+        : 'Đã đóng ${collection.paidCount}';
+
+    return AppCard(
+      onTap: () => _openCollectionPayments(collection),
+      padding: const EdgeInsets.all(AppSpacing.element),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  collection.title,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
-                );
-                _load();
-              }
-            : null,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.small),
+              Flexible(
+                flex: 2,
+                child: Text(
+                  amount,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.small),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  '$deadline · $paidSummary',
+                  style: AppTextStyles.small,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.small),
+              TextButton(
+                onPressed: () => _openCollectionPayments(collection),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.small,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'Xem danh sách',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BalanceSummaryItem extends StatelessWidget {
+  const _BalanceSummaryItem({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.element,
+        vertical: AppSpacing.small,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.onPrimary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        border: Border.all(color: AppColors.onPrimary.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: AppTextStyles.small.copyWith(
+              color: AppColors.onPrimary.withValues(alpha: 0.74),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: AppSpacing.tiny),
+          Text(
+            value,
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.onPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

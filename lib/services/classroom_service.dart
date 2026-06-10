@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/config/app_config.dart';
+import '../models/bank.dart';
 import '../models/class_member.dart';
 import '../models/classroom_bank_account.dart';
 
@@ -157,10 +158,29 @@ class ClassroomService {
     }
   }
 
+  Future<Map<String, dynamic>> getBanks() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/banks'),
+        headers: await _headers(),
+      );
+
+      if (response.statusCode == 200) {
+        final List data = json.decode(response.body);
+        return {
+          'success': true,
+          'data': data.map((e) => Bank.fromJson(e)).toList(),
+        };
+      }
+      return {'success': false, 'message': _errorMessage(response)};
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối: $e'};
+    }
+  }
+
   Future<Map<String, dynamic>> updateBankAccount({
     required int classroomId,
     required String bankBin,
-    required String bankName,
     required String accountNo,
     required String accountName,
     String? note,
@@ -171,7 +191,6 @@ class ClassroomService {
         headers: await _headers(json: true),
         body: json.encode({
           'bankBin': bankBin,
-          'bankName': bankName,
           'accountNo': accountNo,
           'accountName': accountName,
           if (note != null && note.trim().isNotEmpty) 'note': note.trim(),

@@ -2,6 +2,7 @@ class ClassroomBankAccount {
   final int id;
   final String bankBin;
   final String bankName;
+  final String shortName;
   final String accountNo;
   final String accountName;
   final bool active;
@@ -14,6 +15,7 @@ class ClassroomBankAccount {
     required this.id,
     required this.bankBin,
     required this.bankName,
+    required this.shortName,
     required this.accountNo,
     required this.accountName,
     required this.active,
@@ -27,7 +29,8 @@ class ClassroomBankAccount {
     return ClassroomBankAccount(
       id: (json['id'] as num?)?.toInt() ?? 0,
       bankBin: json['bankBin']?.toString() ?? '',
-      bankName: json['bankName']?.toString() ?? '',
+      bankName: json['bankName']?.toString() ?? json['name']?.toString() ?? '',
+      shortName: json['shortName']?.toString() ?? '',
       accountNo: json['accountNo']?.toString() ?? '',
       accountName: json['accountName']?.toString() ?? '',
       active: json['active'] == true,
@@ -40,5 +43,11 @@ class ClassroomBankAccount {
           ? DateTime.tryParse(json['updatedAt'].toString())
           : null,
     );
+  }
+
+  String get displayBankName {
+    if (shortName.trim().isNotEmpty) return shortName.trim();
+    if (bankName.trim().isNotEmpty) return bankName.trim();
+    return bankBin.trim();
   }
 }
