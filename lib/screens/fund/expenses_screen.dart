@@ -189,56 +189,59 @@ class _ExpenseTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String? reason = expense.reason;
-    final String? author = expense.createdByName;
-    final bool hasReason = reason != null && reason.isNotEmpty;
-    final bool hasAuthor = author != null && author.isNotEmpty;
+    final String createdAt = formatDateTime(expense.createdAt);
+    final String? reason = expense.reason?.trim();
+    final String? author = expense.createdByName?.trim();
+    final captionParts = <String>[
+      if (createdAt.isNotEmpty) createdAt,
+      if (reason != null && reason.isNotEmpty) reason,
+      if (author != null && author.isNotEmpty) author,
+    ];
 
     return AppCard(
-      child: Row(
+      padding: const EdgeInsets.all(AppSpacing.element),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.danger.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.south_west_rounded,
-              size: 22,
-              color: AppColors.danger,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.element),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
                   expense.title,
-                  style: AppTextStyles.subtitle,
-                ),
-                const SizedBox(height: AppSpacing.tiny),
-                Text(
-                  formatVnd(expense.amount),
-                  style: AppTextStyles.body.copyWith(
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                if (hasReason) ...[
-                  const SizedBox(height: AppSpacing.tiny),
-                  Text('Lý do: $reason', style: AppTextStyles.caption),
-                ],
-                if (hasAuthor) ...[
-                  const SizedBox(height: AppSpacing.tiny),
-                  Text('Bởi: $author', style: AppTextStyles.small),
-                ],
-              ],
-            ),
+              ),
+              const SizedBox(width: AppSpacing.small),
+              Flexible(
+                flex: 2,
+                child: Text(
+                  '-${formatVnd(expense.amount.abs())}',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
+          if (captionParts.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.tiny),
+            Text(
+              captionParts.join(' · '),
+              style: AppTextStyles.small,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ],
       ),
     );
